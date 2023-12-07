@@ -12,6 +12,8 @@
 * 按标签进行屏蔽（支持正则）
 * 按双重标签进行屏蔽，同时命中两个标签才生效（支持正则）
 
+  
+
 
 # 实现逻辑：
 
@@ -21,7 +23,7 @@
 
 限制API获取频率：优先使用网页元素来获取信息，每个相同的 BV号 ，在3秒内最多查询1次。
 
-‍
+‍  
 
 # 可能干涉的脚本兼容确认：
 
@@ -30,7 +32,7 @@
 ‍
 
 # 相关链接：
-* Greasy Fork：[https://greasyfork.org/zh-CN/scripts/481629-bilibili-blocked-videos-by-tags-titles-duration-video-creators](Bilibili 按标签、标题、时长，UP主屏蔽视频)
+* Greasy Fork：[Bilibili 按标签、标题、时长，UP主屏蔽视频](https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91)
 * GitHub：[https://github.com/tjxwork/bilibili_blocked_videos_by_tags](https://github.com/tjxwork/bilibili_blocked_videos_by_tags)
 * 视频教程：
 
