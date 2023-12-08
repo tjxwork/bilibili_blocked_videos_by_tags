@@ -34,7 +34,7 @@
 # 相关链接：
 * Greasy Fork：[Bilibili 按标签、标题、时长，UP主屏蔽视频](https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91)
 * GitHub：[https://github.com/tjxwork/bilibili_blocked_videos_by_tags](https://github.com/tjxwork/bilibili_blocked_videos_by_tags)
-* 视频教程：
+* 视频教程：[Bilibili 按标签、标题、时长、UP主屏蔽视频 油猴插件【tjxgame】](https://www.bilibili.com/video/BV12i4y1e73B)
 
 ‍
 
