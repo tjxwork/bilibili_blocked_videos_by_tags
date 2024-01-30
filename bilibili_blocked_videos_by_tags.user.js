@@ -1,10 +1,13 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5
+// @version         0.5.1
 // @description     对Bilibili.com的视频卡片元素，以标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
+// @icon            https://www.bilibili.com/favicon.ico
+// @homepageURL     https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91
+// @supportURL      https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91/feedback
 // @match           https://www.bilibili.com/*
 // @match           https://search.bilibili.com/*
 // @exclude         https://www.bilibili.com/anime/*
@@ -35,6 +38,8 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     doubleBlockedTagArray: [],
     // 屏蔽短时长视频(0为不生效)
     blockedShortDuration: 0,
+    // 隐藏视频模式
+    hideVideoModeSwitch: false,
     // 启用日志输出
     consoleOutputLogSwitch: false,
 });
@@ -101,7 +106,7 @@ function blockedMenuUi() {
     menuContent.style.right = "1vh";
     menuContent.style.zIndex = "1000";
     menuContent.style.width = "32em";
-    menuContent.style.height = "58.5em";
+    menuContent.style.height = "61.3em";
     menuContent.style.backgroundColor = uiBackgroundColor;
     menuContent.style.fontSize = "14px";
     menuContent.style.padding = "0.85em";
@@ -114,7 +119,7 @@ function blockedMenuUi() {
     title.style.fontSize = "1.5em";
     title.style.padding = "0";
 
-    // 创建输入模块的辅助函数 (标签文本，保存参数的对象变量，保存参数的对象变量里面的Key名，输入模块的类型)ffff
+    // 创建输入模块的辅助函数 (标签文本，保存参数的对象变量，保存参数的对象变量里面的Key名，输入模块的类型)
     function createInputModule(label, blockedParameterObject, blockedParameterObjectKey, type) {
         // 数组类的输入
         if (type == "Array") {
@@ -258,6 +263,12 @@ function blockedMenuUi() {
         "blockedShortDuration",
         "Number"
     );
+    const hideVideoModeSwitchInput = createInputModule(
+        "隐藏视频而不是使用叠加层覆盖",
+        blockedParameter,
+        "hideVideoModeSwitch",
+        "Bool"
+    );
     const consoleOutputLogSwitchInput = createInputModule(
         "控制台输出日志开关",
         blockedParameter,
@@ -307,6 +318,7 @@ function blockedMenuUi() {
     menuContent.appendChild(blockedTagsInput);
     menuContent.appendChild(doubleBlockedTagsInput);
     menuContent.appendChild(blockedShortDurationInput);
+    menuContent.appendChild(hideVideoModeSwitchInput);
     menuContent.appendChild(consoleOutputLogSwitchInput);
     menuContent.appendChild(menuButtonContainer);
 
@@ -442,6 +454,8 @@ function refreshButtonClickFunction(blockedParameterObject, enableMessage = true
         doubleBlockedTagArray: [],
         // 屏蔽短时长视频(0为不生效)
         blockedShortDuration: 0,
+        // 隐藏视频模式
+        hideVideoModeSwitch: false,
         // 启用日志输出
         consoleOutputLogSwitch: false,
     });
@@ -449,7 +463,7 @@ function refreshButtonClickFunction(blockedParameterObject, enableMessage = true
     // 获取在 blockedMenuUi 菜单UI下，所有带有ID的元素
     let inputIdItem = document.querySelectorAll("#blockedMenuUi > div >[id]");
 
-    // 把 blockedParameter 的数据 写到对应的 多行展示框
+    // 把 blockedParameter 的数据 写到对应的 UI输入框
     for (let item of inputIdItem) {
         if (item.type == "textarea") {
             item.value = blockedParameterObject[item.id].join(",");
@@ -544,6 +558,12 @@ function getVideoElements() {
 
 // 判断是否为已经屏蔽处理过的子元素
 function isAlreadyBlockedChildElement(videoElement) {
+    // 确认是否为已经修改 元素已隐藏 跳过
+    if (videoElement.style.display == "none") {
+        // consoleLogOutput(operationInfo, "元素已隐藏 跳过剩下主函数步骤");
+        return true;
+    }
+
     // 确认是否为已经修改 元素已透明 延迟处理中 跳过
     if (videoElement.style.filter == "blur(5px)") {
         // consoleLogOutput(operationInfo, "元素已透明 延迟处理中 跳过剩下主函数步骤");
@@ -960,11 +980,23 @@ function handleBlockedVideoTag(videoElement, videoBv, withinFetch = false) {
     }
 }
 
-// 创建屏蔽叠加层
+// 创建屏蔽叠加层（屏蔽操作）
 function createOverlay(text, videoElement, operationInfo, setTimeoutStatu = false) {
+    // 获取元素状态，确认是否为已经隐藏
+    if (videoElement.style.display == "none") {
+        consoleLogOutput(operationInfo, "隐藏视频元素 出现重复处理 跳过");
+        return;
+    }
+
     // 获取子元素，确认是否为已经修改
     if (videoElement.firstElementChild.className == "blockedOverlay") {
         consoleLogOutput(operationInfo, "创建屏蔽叠加层 出现重复处理 跳过");
+        return;
+    }
+
+    // 如果启用了隐藏视频模式，直接隐藏元素，跳过剩下的操作
+    if (blockedParameter.hideVideoModeSwitch == true) {
+        videoElement.style.display = "none";
         return;
     }
 
@@ -976,24 +1008,7 @@ function createOverlay(text, videoElement, operationInfo, setTimeoutStatu = fals
     // 猜测: 我一开始以为是使用 fetch 获取API造成的，因为只有 屏蔽标签 这个操作必须通过 fetch 获取标签信息的。
     //      但是出现 屏蔽标题 屏蔽短时长 多种触发的情况下，又不会触发这个Bug了，想不懂，我也不会调试这种加载过程。
 
-    // // 在 导航中的分类页面 创建屏蔽叠加层操作 延迟处理
-    // if (videoElement.firstElementChild.className == "bili-video-card__skeleton hide" && setTimeoutStatu == false) {
-    //     // 元素先改透明
-    //     // videoElement.style.opacity = "0";
-    //     videoElement.style.filter = "blur(10px)"
-    //     // 延迟3秒
-    //     setTimeout(() => {
-    //         // 创建屏蔽叠加层
-    //         createOverlay(text, videoElement, `${operationInfo} 延迟处理`, true);
-    //         //元素再改回不透明
-    //         // videoElement.style.opacity = "1";
-    //         videoElement.style.filter = "none"
-    //     }, 3000);
-
-    //     return;
-    // }
-
-    // 在 视频播放页面 创建屏蔽叠加层操作作延迟处理
+    // 在 视频播放页面 "card-box" 创建屏蔽叠加层操作作延迟处理
     if (videoElement.firstElementChild.className == "card-box" && setTimeoutStatu == false) {
         // 元素先改模糊
         // videoElement.style.opacity = "0";
