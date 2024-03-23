@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5.1
+// @version         0.5.2
+// @note            v0.5.2 修复在搜索页面下，隐藏模式没有正确隐藏视频元素，感谢 Bilibili@痕继痕迹 的指出和宣传！！！
 // @description     对Bilibili.com的视频卡片元素，以标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
@@ -994,11 +995,18 @@ function createOverlay(text, videoElement, operationInfo, setTimeoutStatu = fals
         return;
     }
 
+
     // 如果启用了隐藏视频模式，直接隐藏元素，跳过剩下的操作
     if (blockedParameter.hideVideoModeSwitch == true) {
-        videoElement.style.display = "none";
+        // 判断当前页面URL是否以 https://search.bilibili.com/ 开头
+        if (window.location.href.startsWith("https://search.bilibili.com/")) {
+            videoElement.parentNode.style.display = "none";
+        } else {
+            videoElement.style.display = "none";
+        }
         return;
     }
+
 
     // Bug记录：
     // 位置: 视频播放页面 (即 https://www.bilibili.com/video/BVxxxxxx 页面下)
