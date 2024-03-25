@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2024-03-24 04:32:24
+ * @LastEditTime: 2024-03-26 02:28:43
  * @FilePath: \Chapter05d:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  * 
@@ -15,6 +15,8 @@
 
 # 更新：
 
+* v0.5.3 增加屏蔽生效范围，除原有的 "首页、分区首页、播放页右侧推荐栏、搜索页" 外，  
+    新增 "综合热门、每周必看、入站必刷、旧版首页(部分元素支持)"。
 * v0.5.2 修复在搜索页面下，隐藏模式没有正确隐藏视频元素，感谢 Bilibili@痕继痕迹 的指出和宣传！！！
 * v0.5.1 添加隐藏视频模式
 
@@ -34,7 +36,7 @@
 
 [Video Audio Compressor](https://greasyfork.org/zh-CN/scripts/489529-video-audio-compressor) （视频音量压缩器，防止耳聋，避免响度战争，压缩视频的最大音量）
 
-有时候刷到那些无视音量响度标准的低质视频，音量直接顶到0的那种，能压到-5dB左右，适合习惯B站播放器使用100%音量的人，对正常视频影响不大。
+有时候刷到那些无视音量响度标准的低质视频，音量直接顶到0dB的那种，能压到-5dB左右，适合习惯B站播放器使用100%音量的人，对正常视频影响不大。
 
 ‍ 
 
