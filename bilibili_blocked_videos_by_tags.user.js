@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5.2
-// @note            v0.5.2 修复在搜索页面下，隐藏模式没有正确隐藏视频元素，感谢 Bilibili@痕继痕迹 的指出和宣传！！！
-// @description     对Bilibili.com的视频卡片元素，以标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层。
+// @version         0.5.3
+// @note            v0.5.3 增加屏蔽生效范围: 除原有的 "首页、分区首页、播放页右侧推荐栏、搜索页" 外，新增 "综合热门、每周必看、入站必刷、旧版首页(部分元素支持)"。
+// @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层或者隐藏视频。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
@@ -11,6 +11,9 @@
 // @supportURL      https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91/feedback
 // @match           https://www.bilibili.com/*
 // @match           https://search.bilibili.com/*
+// @match           https://www.bilibili.com/v/popular/all/*
+// @match           https://www.bilibili.com/v/popular/weekly/*
+// @match           https://www.bilibili.com/v/popular/history/*
 // @exclude         https://www.bilibili.com/anime/*
 // @exclude         https://www.bilibili.com/movie/*
 // @exclude         https://www.bilibili.com/guochuang/*
@@ -18,8 +21,10 @@
 // @exclude         https://www.bilibili.com/tv/*
 // @exclude         https://www.bilibili.com/documentary*
 // @exclude         https://www.bilibili.com/mooc/*
-// @exclude         https://www.bilibili.com/v/popular/*
 // @exclude         https://www.bilibili.com/v/virtual/*
+// @exclude         https://www.bilibili.com/v/popular/rank/*
+// @exclude         https://www.bilibili.com/v/popular/music/*
+// @exclude         https://www.bilibili.com/v/popular/drama/*
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
@@ -547,7 +552,14 @@ function consoleLogOutput(...args) {
 function getVideoElements() {
     // 获取所有有可能是视频元素的标签
     var videoElements = document.querySelectorAll(
-        "div.bili-video-card, div.video-page-card-small, li.bili-rank-list-video__item"
+        // div.bili-video-card 首页(https://www.bilibili.com/)、分区首页(https://www.bilibili.com/v/*)、搜索页面(https://search.bilibili.com/*)
+        // div.video-page-card-small 播放页右侧推荐(https://www.bilibili.com/video/BV****)
+        // li.bili-rank-list-video__item 分区首页-子分区右侧热门(https://www.bilibili.com/v/*)
+        // div.video-card 综合热门(https://www.bilibili.com/v/popular/all) 、每周必看(https://www.bilibili.com/v/popular/weekly) 、入站必刷(https://www.bilibili.com/v/popular/history)
+        // div.video-card-reco 旧版首页推送(https://www.bilibili.com/)
+        // div.video-card-common 旧版首页分区(https://www.bilibili.com/)
+        // div.rank-wrap 旧版首页分区右侧排行(https://www.bilibili.com/)
+        "div.bili-video-card, div.video-page-card-small, li.bili-rank-list-video__item, div.video-card, div.video-card-reco, div.video-card-common, div.rank-wrap"
     );
 
     // 过滤掉没有包含a标签的元素
@@ -589,9 +601,9 @@ function getBvAndTitle(videoElement) {
     // 循环处理所有a标签链接
     for (let videoLinkElement of videoLinkElements) {
         // 如果a标签中没有字符，跳过剩余语句，开始下一次循环
-        if (!videoLinkElement.textContent) {
-            continue;
-        }
+        // if (!videoLinkElement.textContent) {
+        //     continue;
+        // }
 
         // 如果a标签中的字符有"稍后再看"，跳过剩余语句，开始下一次循环
         if (/稍后再看/.test(videoLinkElement.textContent)) {
