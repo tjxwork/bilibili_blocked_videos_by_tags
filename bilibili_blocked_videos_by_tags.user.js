@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5.3
-// @note            v0.5.3 增加屏蔽生效范围: 除原有的 "首页、分区首页、播放页右侧推荐栏、搜索页" 外，新增 "综合热门、每周必看、入站必刷、旧版首页(部分元素支持)"。
+// @version         0.5.4
+// @note            v0.5.4 修复 "综合热门、每周必看、入站必刷" 页面的标题无法正常获取的错误。
 // @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层或者隐藏视频。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
@@ -626,9 +626,9 @@ function getBvAndTitle(videoElement) {
             videoInfoDict[videoBv].videoLink = videoLinkElement.href;
             consoleLogOutput(videoBv, "网页上获取的链接: ", videoInfoDict[videoBv].videoLink);
 
-            // 视频标题
-            videoInfoDict[videoBv].videoTitle = videoLinkElement.textContent;
-            consoleLogOutput(videoBv, "网页上获取的标题: ", videoInfoDict[videoBv].videoTitle);
+            // // 视频标题
+            // videoInfoDict[videoBv].videoTitle = videoLinkElement.textContent;
+            // consoleLogOutput(videoBv, "网页上获取的标题: ", videoInfoDict[videoBv].videoTitle);
         }
     }
 
@@ -638,6 +638,11 @@ function getBvAndTitle(videoElement) {
         return false;
     }
 
+
+    // 视频标题 , 从视频元素中获取第一个带 title 属性且不为 span 的标签
+    videoInfoDict[videoBv].videoTitle = videoElement.querySelector('[title]:not(span)').title;
+    consoleLogOutput(videoBv, "网页上获取的标题: ", videoInfoDict[videoBv].videoTitle);
+    
     return videoBv;
 }
 
@@ -817,7 +822,7 @@ function getUpNameAndUpUid(videoElement, videoBv) {
     //获取当前时间
     const currentTime = new Date();
 
-    // 当 lastTimeApiVideoInfo 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
+    // 当 lastTimeApiVideoInfo 上次API获取视频信息的时间存在，并且，和当前的时间差小于3秒时，跳过
     if (
         videoInfoDict[videoBv].lastTimeApiVideoInfo &&
         currentTime - videoInfoDict[videoBv].lastTimeApiVideoInfo < 3000
@@ -909,9 +914,9 @@ function getVideoTags(videoElement, videoBv) {
     //获取当前时间
     const currentTime = new Date();
 
-    // 当 lastTimeApiVideoTag 上次API获取视频信息的时间存在，并且，和当前的时间差小于3秒时，跳过
+    // 当 lastTimeApiVideoTag 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
     if (videoInfoDict[videoBv].lastTimeApiVideoTag && currentTime - videoInfoDict[videoBv].lastTimeApiVideoTag < 3000) {
-        consoleLogOutput(videoBv, "getVideoTags 距离上次 Fetch 获取视频信息还未超过3秒钟");
+        consoleLogOutput(videoBv, "getVideoTags 距离上次 Fetch 获取视频标签还未超过3秒钟");
         return;
     }
 
