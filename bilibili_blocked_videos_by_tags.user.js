@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5.4
-// @note            v0.5.4 修复 "综合热门、每周必看、入站必刷" 页面的标题无法正常获取的错误。
+// @version         0.5.5
+// @note            v0.5.5 修复 视频播放页右侧推荐视频，按UP主名称屏蔽失效，感谢“雪炭翁” 的指出。
 // @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层或者隐藏视频。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
@@ -734,6 +734,13 @@ function getDuration(videoElement, videoBv) {
             videoInfoDict[videoBv].videoDuration = videoApiInfoJson.data.duration;
             consoleLogOutput(videoBv, "getDuration() API获取的视频时长: ", videoInfoDict[videoBv].videoDuration, "秒");
 
+            // videoInfoDict[videoBv].videoWidth = videoApiInfoJson.data.dimension.width;
+            // videoInfoDict[videoBv].videoHeight = videoApiInfoJson.data.dimension.height;
+            // consoleLogOutput(videoBv, "getDuration() API获取的视频分辨率: ", videoInfoDict[videoBv].videoWidth ,"x", videoInfoDict[videoBv].videoHeight);
+
+            // videoInfoDict[videoBv].videoDesc = videoApiInfoJson.data.desc;
+            // consoleLogOutput(videoBv, "getDuration() API获取的视频简介: ", videoInfoDict[videoBv].videoUpName);
+            
             // 尝试在fetch异步结束后直接屏蔽处理 匹配的短时长视频
             handleBlockedShortDuration(videoElement, videoBv, true);
 
@@ -807,8 +814,10 @@ function getUpNameAndUpUid(videoElement, videoBv) {
             consoleLogOutput(videoBv, "网页上获取的UP主UID: ", videoInfoDict[videoBv].videoUpUid);
 
             // 视频Up名称
-            videoInfoDict[videoBv].videoUpName = videoLinkElement.textContent;
-            videoInfoDict[videoBv].videoUpName = videoInfoDict[videoBv].videoUpName.replace(/\s?·\s\S*$/, "");
+            //videoInfoDict[videoBv].videoUpName = videoLinkElement.textContent;
+            //videoInfoDict[videoBv].videoUpName = videoInfoDict[videoBv].videoUpName.replace(/\s?·\s\S*$/, "");
+            videoInfoDict[videoBv].videoUpName = videoLinkElement.querySelector("span").innerText;
+
             consoleLogOutput(videoBv, "网页上获取的UP主名称: ", videoInfoDict[videoBv].videoUpName);
         }
     }
@@ -853,6 +862,14 @@ function getUpNameAndUpUid(videoElement, videoBv) {
                 videoInfoDict[videoBv].videoDuration,
                 "秒"
             );
+
+            // videoInfoDict[videoBv].videoWidth = videoApiInfoJson.data.dimension.width;
+            // videoInfoDict[videoBv].videoHeight = videoApiInfoJson.data.dimension.height;
+            // consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的视频分辨率: ", videoInfoDict[videoBv].videoWidth ,"x", videoInfoDict[videoBv].videoHeight);
+
+            // videoInfoDict[videoBv].videoDesc = videoApiInfoJson.data.desc;
+            // consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的视频简介: ", videoInfoDict[videoBv].videoUpName);
+
 
             // 尝试在fetch异步结束后直接屏蔽处理 匹配的屏蔽Up主名称或Up主Uid
             handleBlockedUpNameOrUpUid(videoElement, videoBv, true);
