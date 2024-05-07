@@ -111,11 +111,12 @@ function blockedMenuUi() {
     menuContent.style.bottom = "5vh";
     menuContent.style.right = "1vh";
     menuContent.style.zIndex = "1000";
-    menuContent.style.width = "32em";
-    menuContent.style.height = "61.3em";
+    menuContent.style.width = "33em";
+    menuContent.style.height = "calc(100vh - 200px)";
     menuContent.style.backgroundColor = uiBackgroundColor;
     menuContent.style.fontSize = "14px";
     menuContent.style.padding = "0.85em";
+    menuContent.style.overflowY = "auto";
 
     // 创建标题
     const title = document.createElement("div");
