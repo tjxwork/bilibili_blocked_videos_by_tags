@@ -48,6 +48,8 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     hideVideoModeSwitch: false,
     // 启用日志输出
     consoleOutputLogSwitch: false,
+    // 屏蔽订阅地址
+    blockedSubscribe: [],
 });
 
 // 配色
@@ -264,6 +266,8 @@ function blockedMenuUi() {
         "doubleBlockedTagArray",
         "Array"
     );
+    if (!blockedParameter.blockedSubscribe) blockedParameter.blockedSubscribe = [];
+    const blockedSubscribeInput = createInputModule("屏蔽数据订阅", blockedParameter, "blockedSubscribe", "Array");
     const blockedShortDurationInput = createInputModule(
         "按时间短于指定秒数视频屏蔽 (0为不生效)",
         blockedParameter,
@@ -324,6 +328,7 @@ function blockedMenuUi() {
     menuContent.appendChild(blockedNamesInput);
     menuContent.appendChild(blockedTagsInput);
     menuContent.appendChild(doubleBlockedTagsInput);
+    menuContent.appendChild(blockedSubscribeInput);
     menuContent.appendChild(blockedShortDurationInput);
     menuContent.appendChild(hideVideoModeSwitchInput);
     menuContent.appendChild(consoleOutputLogSwitchInput);
@@ -465,6 +470,8 @@ function refreshButtonClickFunction(blockedParameterObject, enableMessage = true
         hideVideoModeSwitch: false,
         // 启用日志输出
         consoleOutputLogSwitch: false,
+        // 屏蔽订阅
+        blockedSubscribe: [],
     });
 
     // 获取在 blockedMenuUi 菜单UI下，所有带有ID的元素
@@ -1099,8 +1106,31 @@ function createOverlay(text, videoElement, operationInfo, setTimeoutStatu = fals
 
 // -----------------主函数----------------------
 
+// 订阅数据处理
+function handleSubscribe() {
+    if (blockedParameter.blockedSubscribe.length) {
+        // 只合并这几个数据
+        const mergeKeys = ["blockedTitleArray","blockedNameOrUidArray","blockedTagArray","doubleBlockedTagArray"];
+        blockedParameter.blockedSubscribe.map((url) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                onload: function(response) {
+                    const blockedParam = JSON.parse(response.responseText);
+                    mergeKeys.forEach((k) => {
+                        blockedParameter[k] = [...new Set([...blockedParameter[k], ...(blockedParam[k] ?? [])])];
+                    });
+                }
+            });
+        });
+    }
+}
+
 // 屏蔽Bilibili上的符合屏蔽条件的视频
 function FuckYouBilibiliRecommendationSystem() {
+    // 处理订阅信息
+    handleSubscribe();
+    
     // 获取所有包含B站视频相关标签的视频元素
     const videoElementArray = getVideoElements();
 
