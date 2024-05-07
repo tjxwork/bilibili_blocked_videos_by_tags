@@ -902,6 +902,9 @@ function handleBlockedUpNameOrUpUid(videoElement, videoBv, withinFetch = false) 
         if (blockedNameOrUid == videoInfoDict[videoBv].videoUpName) {
             return videoInfoDict[videoBv].videoUpName;
         }
+        if (videoInfoDict[videoBv].videoUpName.includes(blockedNameOrUid)) {
+            return videoInfoDict[videoBv].videoUpName;
+        }
     });
     if (blockedNameOrUidFind) {
         createOverlay(`屏蔽UP: ${blockedNameOrUidFind}`, videoElement, `${videoBv} handleBlockedUpNameOrUpUid()`);
