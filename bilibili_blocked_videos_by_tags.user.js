@@ -2,7 +2,6 @@
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
 // @version         0.5.5
-// @note            v0.5.5 修复 视频播放页右侧推荐视频，按UP主名称屏蔽失效，感谢“雪炭翁” 的指出。
 // @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层或者隐藏视频。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
@@ -28,9 +27,14 @@
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
+// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
+// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
+
+
+
 
 // 初始化屏蔽参数变量
 let blockedParameter = GM_getValue("GM_blockedParameter", {
@@ -51,30 +55,14 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
 });
 
 // 配色
-
-// 主窗体背景色
-const uiBackgroundColor = "#303030";
-
-// 输入模块背景色
-const uiInputContainerBackgroundColor = "#404040";
-
-// 输入框背景色
-const uiInputBoxBackgroundColor = "#595959";
-
-// 文字颜色
-const uiTextColor = "rgb(250,250,250)";
-
-// 按钮色
-const uiButtonColor = "rgb(0, 174, 236)";
-
-// 边框色
-const uiBorderColor = "rgba(0, 0, 0, 0)";
-
-// 提醒框背景色
-const uiPromptBoxColor = "rgb(42,44,53)";
-
-// 屏蔽叠加层背景色
-const blockedOverlayColor = "rgba(60, 60, 60, 0.85)";
+const uiBackgroundColor = "#263238"; // 主窗体背景色
+const uiInputContainerBackgroundColor = "#37474F"; // 输入模块背景色
+const uiInputBoxBackgroundColor = "#455A64"; // 输入框背景色
+const uiTextColor = "#FFFFFF"; // 文字颜色
+const uiButtonColor = "#448AFF"; // 按钮色
+const uiBorderColor = "rgba(0,0,0,0)"; // 边框色
+const uiPromptBoxColor = "#E0F2F1"; // 提醒框背景色
+const blockedOverlayColor = "rgba(0, 0, 0, 0.85)"; // 屏蔽叠加层背景色
 
 // --------------------菜单UI部分--------------------
 
@@ -94,12 +82,50 @@ const basicsStyles = {
     fontFamily: '"Cascadia Mono", Monaco, Consolas, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif',
 };
 
+
 // 添加基础样式辅助函数
 function addStyles(element, styles) {
     for (const style in styles) {
         element.style[style] = styles[style];
     }
 }
+
+
+// 使标题栏可拖动的函数
+function makeDraggable(element) {
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    element.addEventListener('mousedown', (e) => {
+        if (e.target.constructor.name !== 'HTMLTextAreaElement' &&e.target.constructor.name !== 'HTMLInputElement')
+        {
+            isDragging = true;
+            const rect = element.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            element.style.cursor = 'grabbing';
+            element.style.transform = '';
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            // 直接使用mouse的位置减去偏移量设置元素位置
+            element.style.left = `${e.clientX - offsetX}px`;
+            element.style.top = `${e.clientY - offsetY}px`;
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        element.style.cursor = 'default';
+    });
+}
+
+
+
+
 
 // 屏蔽菜单UI
 function blockedMenuUi() {
@@ -108,14 +134,17 @@ function blockedMenuUi() {
     menuContent.id = "blockedMenuUi";
     addStyles(menuContent, basicsStyles);
     menuContent.style.position = "fixed";
-    menuContent.style.bottom = "5vh";
-    menuContent.style.right = "1vh";
+    menuContent.style.top = "50%";
+    menuContent.style.left = "50%";
+    menuContent.style.transform = "translate(-50%, -50%)";
     menuContent.style.zIndex = "1000";
-    menuContent.style.width = "32em";
-    menuContent.style.height = "61.3em";
+    menuContent.style.width = "36vw";
+    menuContent.style.height = "64vh";
     menuContent.style.backgroundColor = uiBackgroundColor;
-    menuContent.style.fontSize = "14px";
+    menuContent.style.fontSize = "12px";
     menuContent.style.padding = "0.85em";
+    menuContent.style.overflowY = "auto";
+
 
     // 创建标题
     const title = document.createElement("div");
@@ -124,6 +153,7 @@ function blockedMenuUi() {
     title.style.textAlign = "center";
     title.style.fontSize = "1.5em";
     title.style.padding = "0";
+    title.style.color = "rgb(255, 255, 255)";
 
     // 创建输入模块的辅助函数 (标签文本，保存参数的对象变量，保存参数的对象变量里面的Key名，输入模块的类型)
     function createInputModule(label, blockedParameterObject, blockedParameterObjectKey, type) {
@@ -328,6 +358,7 @@ function blockedMenuUi() {
     menuContent.appendChild(consoleOutputLogSwitchInput);
     menuContent.appendChild(menuButtonContainer);
 
+    makeDraggable(menuContent);
     // 将弹窗添加到页面
     document.body.appendChild(menuContent);
 }
@@ -520,6 +551,8 @@ function showFloatingReminder(message) {
         element.removeChild(reminderElement);
     }, 3000);
 }
+
+
 
 // 在油猴扩展中添加脚本菜单选项
 GM_registerMenuCommand("屏蔽参数面板", blockedMenuUi);
