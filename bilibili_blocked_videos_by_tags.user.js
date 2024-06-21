@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         0.5.5
-// @note            v0.5.5 修复 视频播放页右侧推荐视频，按UP主名称屏蔽失效，感谢“雪炭翁” 的指出。
-// @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 来判断匹配，添加一个屏蔽叠加层或者隐藏视频。
+// @version         1.0.0
+// @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
+// @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
+// @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
+// @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 等信息来进行判断匹配，添加一个屏蔽叠加层或者隐藏视频。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
-// @homepageURL     https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91
-// @supportURL      https://greasyfork.org/zh-CN/scripts/481629-bilibili-%E6%8C%89%E6%A0%87%E7%AD%BE-%E6%A0%87%E9%A2%98-%E6%97%B6%E9%95%BF-up%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91/feedback
 // @match           https://www.bilibili.com/*
 // @match           https://search.bilibili.com/*
 // @match           https://www.bilibili.com/v/popular/all/*
@@ -22,503 +22,785 @@
 // @exclude         https://www.bilibili.com/documentary*
 // @exclude         https://www.bilibili.com/mooc/*
 // @exclude         https://www.bilibili.com/v/virtual/*
-// @exclude         https://www.bilibili.com/v/popular/rank/*
 // @exclude         https://www.bilibili.com/v/popular/music/*
 // @exclude         https://www.bilibili.com/v/popular/drama/*
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
+// @grant           GM_addStyle
+// @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
 // ==/UserScript==
 
 "use strict";
 
-// 初始化屏蔽参数变量
+// --------------------参数变量初始化--------------------
+
+// 初始化屏蔽参数变量，从 油猴扩展存储 读取到 blockedParameter
 let blockedParameter = GM_getValue("GM_blockedParameter", {
-    // 屏蔽标题数组
-    blockedTitleArray: [],
-    // 屏蔽UP主或者Uid数组
-    blockedNameOrUidArray: [],
-    // 屏蔽标签数组
-    blockedTagArray: [],
-    // 双重屏蔽标签数组
-    doubleBlockedTagArray: [],
-    // 屏蔽短时长视频(0为不生效)
+    // 屏蔽标题
+    blockedTitle_Switch: true,
+    blockedTitle_UseRegular: true,
+    blockedTitle_Array: [],
+
+    // 屏蔽Up主和Uid
+    blockedNameOrUid_Switch: true,
+    blockedNameOrUid_UseRegular: false,
+    blockedNameOrUid_Array: [],
+
+    // 屏蔽视频分区
+    blockedVideoPartitions_Switch: true,
+    blockedVideoPartitions_UseRegular: false,
+    blockedVideoPartitions_Array: [],
+
+    // 屏蔽标签
+    blockedTag_Switch: true,
+    blockedTag_UseRegular: true,
+    blockedTag_Array: [],
+
+    // 屏蔽双重屏蔽标签
+    doubleBlockedTag_Switch: true,
+    doubleBlockedTag_UseRegular: true,
+    doubleBlockedTag_Array: [],
+
+    // 屏蔽短时长视频
+    blockedShortDuration_Switch: false,
     blockedShortDuration: 0,
-    // 隐藏视频模式
-    hideVideoModeSwitch: false,
-    // 启用日志输出
-    consoleOutputLogSwitch: false,
+
+    // 屏蔽低播放量视频
+    blockedBelowVideoViews_Switch: false,
+    blockedBelowVideoViews: 0,
+
+    // 屏蔽低于指定点赞率的视频
+    blockedBelowLikesRate_Switch: false,
+    blockedBelowLikesRate: 0,
+
+    // 屏蔽竖屏视频
+    blockedPortraitVideo_Switch: false,
+
+    // 白名单Up主和Uid
+    whitelistNameOrUid_Switch: false,
+    whitelistNameOrUid_Array: [],
+
+    // 隐藏非视频元素
+    hideNonVideoElements_Switch: true,
+
+    // 隐藏视频而非叠加层模式
+    hideVideoMode_Switch: false,
+
+    // 控制台输出日志
+    consoleOutputLog_Switch: false,
 });
 
-// 配色
+// 旧参数适配
+function oldParameterAdaptation(obj) {
+    //判断是否为旧参数，是的话就修改为新参数结构
+    if (Object.prototype.hasOwnProperty.call(obj, "blockedTitleArray")) {
+        // 屏蔽标题
+        obj["blockedTitle_Switch"] = true;
+        obj["blockedTitle_UseRegular"] = true;
+        obj["blockedTitle_Array"] = obj["blockedTitleArray"];
+        delete obj["blockedTitleArray"];
 
-// 主窗体背景色
-const uiBackgroundColor = "#303030";
+        // 屏蔽Up主和Uid
+        obj["blockedNameOrUid_Switch"] = true;
+        obj["blockedNameOrUid_UseRegular"] = true;
+        obj["blockedNameOrUid_Array"] = obj["blockedNameOrUidArray"];
+        delete obj["blockedNameOrUidArray"];
 
-// 输入模块背景色
-const uiInputContainerBackgroundColor = "#404040";
+        // 屏蔽视频分区
+        obj["blockedVideoPartitions_Switch"] = false;
+        obj["blockedVideoPartitions_UseRegular"] = false;
+        obj["blockedVideoPartitions_Array"] = [];
 
-// 输入框背景色
-const uiInputBoxBackgroundColor = "#595959";
+        // 屏蔽标签
+        obj["blockedTag_Switch"] = true;
+        obj["blockedTag_UseRegular"] = true;
+        obj["blockedTag_Array"] = obj["blockedTagArray"];
+        delete obj["blockedTagArray"];
 
-// 文字颜色
-const uiTextColor = "rgb(250,250,250)";
+        // 屏蔽双重屏蔽标签
+        obj["doubleBlockedTag_Switch"] = true;
+        obj["doubleBlockedTag_UseRegular"] = true;
+        obj["doubleBlockedTag_Array"] = obj["doubleBlockedTagArray"];
+        delete obj["doubleBlockedTagArray"];
 
-// 按钮色
-const uiButtonColor = "rgb(0, 174, 236)";
+        // 屏蔽短时长视频
+        obj["blockedShortDuration_Switch"] = true;
 
-// 边框色
-const uiBorderColor = "rgba(0, 0, 0, 0)";
+        // 白名单Up主和Uid
+        obj["whitelistNameOrUid_Switch"] = false;
+        obj["whitelistNameOrUid_Array"] = [];
 
-// 提醒框背景色
-const uiPromptBoxColor = "rgb(42,44,53)";
+        // 隐藏视频而非叠加层模式
+        obj["hideVideoMode_Switch"] = obj["hideVideoModeSwitch"];
+        delete obj["hideVideoModeSwitch"];
 
-// 屏蔽叠加层背景色
-const blockedOverlayColor = "rgba(60, 60, 60, 0.85)";
+        // 控制台输出日志
+        obj["consoleOutputLog_Switch"] = obj["consoleOutputLogSwitch"];
+        delete obj["consoleOutputLogSwitch"];
+    }
+}
+oldParameterAdaptation(blockedParameter);
 
 // --------------------菜单UI部分--------------------
 
-// 通用的基础样式
-const basicsStyles = {
-    boxSizing: "border-box",
-    padding: "0 0.5em",
-    marginBottom: "0.5em",
-    borderStyle: "solid",
-    borderWidth: "1px",
-    borderColor: uiBorderColor,
-    borderRadius: "0.3em",
-    lineHeight: "1.5em",
-    fontSize: "1em",
-    verticalAlign: "middle",
-    color: uiTextColor,
-    fontFamily: '"Cascadia Mono", Monaco, Consolas, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif',
-};
-
-// 添加基础样式辅助函数
-function addStyles(element, styles) {
-    for (const style in styles) {
-        element.style[style] = styles[style];
-    }
+// 菜单UI的CSS，使用 GM_addStyle 注入 CSS
+GM_addStyle(`
+:root {
+    /* 主窗体背景色 */
+    --uiBackgroundColor: rgb(48, 48, 48);
+    /* 输入模块背景色 */
+    --uiInputContainerBackgroundColor: rgb(64, 64, 64);
+    /* 输入框背景色 */
+    --uiInputBoxBackgroundColor: rgb(89, 89, 89);
+    /* 滚动条背景色 */
+    --uiScrollbarBackgroundColor: rgb(141, 141, 141);
+    /* 文字颜色 */
+    --uiTextColor: rgb(250, 250, 250);
+    /* 按钮色 */
+    --uiButtonColor: rgb(0, 174, 236);
+    /* 边框色 */
+    --uiBorderColor: rgba(0, 0, 0, 0);
+    /* 提醒框背景色 */
+    --uiPromptBoxColor: rgb(42, 44, 53);
+    /* 屏蔽叠加层背景色 */
+    --blockedOverlayColor: rgba(60, 60, 60, 0.85);
+    /* 字体大小 */
+    --fontSize: 14px;
+    /* 行高 */
+    --lineHeight: 24px;
+    /* 圆角 */
+    --borderRadius: 4px;
 }
 
-// 屏蔽菜单UI
+/* 菜单UI */
+#blockedMenuUi {
+    font-size: var(--fontSize);
+    position: fixed;
+    bottom: 4vh;
+    right: 2vw;
+    z-index: 1005;
+    width: 460px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background-color: var(--uiBackgroundColor);
+}
+
+#blockedMenuUi,
+#blockedMenuUi * {
+    color: var(--uiTextColor);
+    box-sizing: border-box;
+    border-style: solid;
+    border-width: 0px;
+    border-color: var(--uiBorderColor);
+    border-radius: var(--borderRadius);
+    line-height: var(--lineHeight);
+    vertical-align: middle;
+    font-family: "Cascadia Mono", Monaco, Consolas, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+}
+
+/* 滚动条 */
+#blockedMenuUi::-webkit-scrollbar,
+#blockedMenuUi ul::-webkit-scrollbar {
+    width: 7px;
+}
+
+/* 滚动条 轨道*/
+#blockedMenuUi::-webkit-scrollbar-track,
+#blockedMenuUi ul::-webkit-scrollbar-track {
+    background: var(--uiScrollbarBackgroundColor);
+    border-radius: 7px;
+}
+
+/* 滚动条 滑块*/
+#blockedMenuUi::-webkit-scrollbar-thumb,
+#blockedMenuUi ul::-webkit-scrollbar-thumb {
+    background: var(--uiInputContainerBackgroundColor);
+    border-radius: 7px;
+}
+
+/* 滚动条 滑块 鼠标经过 */
+#blockedMenuUi::-webkit-scrollbar-thumb:hover,
+#blockedMenuUi ul::-webkit-scrollbar-thumb:hover {
+    background: var(--uiInputBoxBackgroundColor);
+    border-radius: 7px;
+}
+
+/* 滚动条 滑块 鼠标点击 */
+#blockedMenuUi::-webkit-scrollbar-thumb:active,
+#blockedMenuUi ul::-webkit-scrollbar-thumb:active {
+    background: var(--uiButtonColor);
+    border-radius: 7px;
+}
+
+#menuTitle {
+    font-size: 18px;
+    text-align: center;
+    margin: 10px;
+}
+
+.menuOptions {
+    background-color: var(--uiInputContainerBackgroundColor);
+    padding: 10px;
+    margin: 0 10px;
+    margin-bottom: 10px;
+}
+
+.titleLabelLeft {
+    display: inline-block;
+    width: 275px;
+    margin-bottom: 5px;
+}
+
+.titleLabelRight {
+    display: inline-block;
+    margin-bottom: 5px;
+}
+
+#blockedMenuUi label {
+    font-size: 16px;
+    vertical-align: middle;
+}
+
+#blockedMenuUi input {
+    background-color: var(--uiInputBoxBackgroundColor);
+    font-size: var(--fontSize);
+    line-height: var(--lineHeight);
+    border-radius: var(--borderRadius);
+    padding: 0 5px;
+    margin-bottom: 5px;
+    width: 360px;
+    vertical-align: middle;
+}
+
+#blockedMenuUi input[type="number"] {
+    width: 4em;
+    margin: 0 5px;
+    padding: 0 5px;
+    text-align: right;
+    appearance: none;
+}
+
+#blockedMenuUi input[type="number"]::-webkit-inner-spin-button,
+#blockedMenuUi input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#blockedMenuUi input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    margin-bottom: 2.5px;
+    margin-right: 5px;
+    appearance: none;
+    border: 1.5px solid var(--uiTextColor);
+    border-radius: 8px;
+}
+
+#blockedMenuUi input[type="checkbox"]:checked {
+    border: 3px solid;
+    background-color: var(--uiButtonColor);
+}
+
+#blockedMenuUi button {
+    line-height: var(--lineHeight);
+    border-radius: var(--borderRadius);
+    padding: 0;
+    margin-bottom: 5px;
+    margin-left: 5px;
+    width: 45px;
+    vertical-align: middle;
+    background-color: var(--uiButtonColor);
+    transition: background-color 0.1s ease;
+}
+
+#blockedMenuUi button:hover {
+    background-color: rgb(17, 154, 204);
+}
+
+#blockedMenuUi button:active {
+    background-color: rgb(62, 203, 255);
+}
+
+#blockedMenuUi ul {
+    background-color: var(--uiInputBoxBackgroundColor);
+    font-size: 14px;
+    padding: 5px 5px 0px 0px;
+    margin-inline: 0px;
+    margin: 0;
+    width: 100%;
+    min-height: 34px;
+    max-height: 92px;
+    overflow-y: auto;
+}
+
+#blockedMenuUi li {
+    line-height: var(--lineHeight);
+    border-radius: var(--borderRadius);
+    display: inline-block;
+    padding: 0 5px;
+    margin-bottom: 5px;
+    margin-left: 5px;
+    vertical-align: middle;
+    background-color: var(--uiButtonColor);
+}
+
+
+#blockedMenuUi li button {
+    width: 20px;
+    margin: 0px;
+    padding: 0 0 3px 0;
+    font-size: 24px;
+    line-height: 18px;
+    border: 0px;
+}
+
+#blockedMenuUi li button:hover {
+    background-color: var(--uiButtonColor);
+    color: rgb(221, 221, 221);
+}
+
+#blockedMenuUi li button:active {
+    background-color: var(--uiButtonColor);
+    color: var(--uiButtonColor);
+}
+
+#blockedMenuUi textarea {
+    background-color: var(--uiInputBoxBackgroundColor);
+    font-size: 14px;
+    padding: 0 5px;
+    width: 100%;
+    resize: none;
+}
+
+#menuButtonContainer {
+    position: sticky;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: var(--uiBackgroundColor);
+    margin-top: -10px;
+}
+
+#menuButtonContainer button {
+    line-height: var(--lineHeight);
+    border-radius: var(--borderRadius);
+    font-size: 16px;
+    border: 0;
+    padding: 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 10px;
+    height: 45px;
+    width: 45px;
+    vertical-align: middle;
+    background-color: var(--uiButtonColor);
+}
+
+#menuButtonContainer label {
+    line-height: 45px;
+    border-radius: var(--borderRadius);
+    display: inline-block;
+    border: 0;
+    padding: 0;
+    margin: 10px 20px;
+    height: 45px;
+    width: 130px;
+    vertical-align: middle;
+    text-align: center;
+    background-color: var(--uiInputBoxBackgroundColor);
+    transition: opacity 1s;
+}
+
+@media (min-width: 1560px) and (max-width: 2059.9px) {
+    .recommended-container_floor-aside .container>*:nth-of-type(n + 8) {
+        margin-top: 0;
+    }
+
+    @media (min-width: 1560px) and (max-width: 2059.9px) {
+        .recommended-container_floor-aside .container.is-version8>*:nth-of-type(n + 13) {
+            margin-top: 0;
+        }
+    }
+`);
+
+// 菜单UI的HTML
+let menuUiHTML = `
+
+<div id="blockedMenuUi">
+<div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.0</div>
+
+<div id="menuOptionsList">
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽 </label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+            v-model="tempInputValue.blockedTitle_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTitle_Array')">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.blockedTitle_Array">
+                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTitle_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽</label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+            v-model="tempInputValue.blockedNameOrUid_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedNameOrUid_Array')">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.blockedNameOrUid_Array">
+                {{value}}<button
+                    @click="delArrayButton(index, menuUiSettings.blockedNameOrUid_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽</label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+            v-model="tempInputValue.blockedVideoPartitions_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
+                {{value}}<button
+                    @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽</label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTag_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+            v-model="tempInputValue.blockedTag_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTag_Array')">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.blockedTag_Array">
+                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTag_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽</label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder='多项输入请用英文逗号间隔(以"A标签|B标签"格式添加)' spellcheck="false"
+            v-model="tempInputValue.doubleBlockedTag_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'doubleBlockedTag_Array' )">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.doubleBlockedTag_Array">
+                {{value}}<button
+                    @click="delArrayButton(index, menuUiSettings.doubleBlockedTag_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(白名单)</label>
+        </div>
+
+        <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
+            v-model="tempInputValue.whitelistNameOrUid_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'whitelistNameOrUid_Array' )">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.whitelistNameOrUid_Array">
+                {{value}}<button
+                    @click="delArrayButton(index, menuUiSettings.whitelistNameOrUid_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.blockedShortDuration_Switch" />屏蔽低于指定时长的视频</label>
+        </div>
+        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedShortDuration" />
+        <label>秒</label>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.blockedBelowVideoViews_Switch" />屏蔽低于指定播放量的视频</label>
+        </div>
+        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowVideoViews" />
+        <label>次</label>
+    </div>
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox"
+                    v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于指定点赞率的视频</label>
+        </div>
+        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
+        <label>%</label>
+    </div>
+
+
+    <div class="menuOptions">
+        <label><input type="checkbox" v-model="menuUiSettings.blockedPortraitVideo_Switch" />屏蔽竖屏视频</label>
+    </div>
+
+    <div class="menuOptions">
+        <label><input type="checkbox"
+                v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素（直播、番剧、广告……）</label>
+    </div>
+
+    <div class="menuOptions">
+        <label><input type="checkbox" v-model="menuUiSettings.hideVideoMode_Switch" />隐藏视频而不是使用叠加层覆盖</label>
+    </div>
+
+    <div class="menuOptions">
+        <label><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关</label>
+    </div>
+    </div>
+
+    <div id="menuButtonContainer">
+        <button @click="refreshButton()">读取</button>
+        <button @click="saveButton()">保存</button>
+        <button @click="closeButton()">关闭</button>
+        <button @click="authorButton()">作者</button>
+        <button @click="supportButton()">赞助</button>
+
+
+        <label :style="{ opacity: tempInputValue.promptText_Opacity }"
+            v-show="tempInputValue.promptText_Switch">{{tempInputValue.promptText}}</label>
+    </div>
+</div>
+
+`;
+
+// 菜单UI
 function blockedMenuUi() {
-    // 创建菜单Ui的Div
-    const menuContent = document.createElement("div");
-    menuContent.id = "blockedMenuUi";
-    addStyles(menuContent, basicsStyles);
-    menuContent.style.position = "fixed";
-    menuContent.style.bottom = "5vh";
-    menuContent.style.right = "1vh";
-    menuContent.style.zIndex = "1000";
-    menuContent.style.width = "32em";
-    menuContent.style.height = "61.3em";
-    menuContent.style.backgroundColor = uiBackgroundColor;
-    menuContent.style.fontSize = "14px";
-    menuContent.style.padding = "0.85em";
-
-    // 创建标题
-    const title = document.createElement("div");
-    title.textContent = "Bilibili按标签/标题/时长/UP主屏蔽视频";
-    addStyles(title, basicsStyles);
-    title.style.textAlign = "center";
-    title.style.fontSize = "1.5em";
-    title.style.padding = "0";
-
-    // 创建输入模块的辅助函数 (标签文本，保存参数的对象变量，保存参数的对象变量里面的Key名，输入模块的类型)
-    function createInputModule(label, blockedParameterObject, blockedParameterObjectKey, type) {
-        // 数组类的输入
-        if (type == "Array") {
-            // 创建父级容器
-            const container = document.createElement("div");
-            addStyles(container, basicsStyles);
-            container.style.backgroundColor = uiInputContainerBackgroundColor;
-
-            // 创建提示标签
-            const inputLabel = document.createElement("label");
-            inputLabel.textContent = label;
-            addStyles(inputLabel, basicsStyles);
-            inputLabel.style.display = "block";
-            inputLabel.style.marginTop = "0.5em";
-
-            // 创建输入框
-            const inputBox = document.createElement("input");
-            inputBox.type = "text";
-            inputBox.placeholder = "多项输入请用英文逗号间隔";
-            inputBox.spellcheck = false;
-            addStyles(inputBox, basicsStyles);
-            inputBox.style.backgroundColor = uiInputBoxBackgroundColor;
-            inputBox.style.width = "25em";
-
-            // 创建添加按钮
-            const addButton = document.createElement("button");
-            addButton.textContent = "添加";
-            addButton.addEventListener("click", addButtonClickFunction);
-            addStyles(addButton, basicsStyles);
-            addButton.style.backgroundColor = uiButtonColor;
-            addButton.style.marginLeft = "0.5em";
-
-            // 创建已有数据的多行展示框
-            const inputMultiLineDisplayBox = document.createElement("textarea");
-            inputMultiLineDisplayBox.id = blockedParameterObjectKey;
-            inputMultiLineDisplayBox.value = blockedParameterObject[blockedParameterObjectKey];
-            inputMultiLineDisplayBox.rows = "3"; // 设置多行展示框的行数
-            inputMultiLineDisplayBox.placeholder = "也可以直接编辑该输入框内容，“保存”后生效";
-            inputMultiLineDisplayBox.spellcheck = false;
-            addStyles(inputMultiLineDisplayBox, basicsStyles);
-            inputMultiLineDisplayBox.style.backgroundColor = uiInputBoxBackgroundColor;
-            inputMultiLineDisplayBox.style.width = "100%";
-            inputMultiLineDisplayBox.style.resize = "none"; // 禁止拖动
-            inputMultiLineDisplayBox.style.padding = "0.5em";
-
-            // 组合元素
-            container.appendChild(inputLabel);
-            container.appendChild(inputBox);
-            container.appendChild(addButton);
-            container.appendChild(inputMultiLineDisplayBox);
-
-            return container;
-        }
-        // 数值类的输入
-        if (type == "Number") {
-            // 创建父级容器
-            const container = document.createElement("div");
-            addStyles(container, basicsStyles);
-            container.style.backgroundColor = uiInputContainerBackgroundColor;
-            container.style.lineHeight = "2em";
-
-            // 创建提示标签
-            const inputLabel = document.createElement("label");
-            addStyles(inputLabel, basicsStyles);
-            inputLabel.textContent = label;
-            inputLabel.style.marginTop = "0.5em";
-
-            // 创建输入框
-            const inputBox = document.createElement("input");
-            inputBox.type = "number";
-            inputBox.id = blockedParameterObjectKey;
-            inputBox.value = blockedParameterObject[blockedParameterObjectKey];
-            inputBox.spellcheck = false;
-            addStyles(inputBox, basicsStyles);
-            inputBox.style.backgroundColor = uiInputBoxBackgroundColor;
-            inputBox.style.width = "6em";
-            inputBox.style.margin = "0";
-            inputBox.style.verticalAlign = "baseline";
-
-            // 组合元素
-            container.appendChild(inputLabel);
-            container.appendChild(inputBox);
-
-            return container;
-        }
-        // 布尔类的输入
-        if (type == "Bool") {
-            // 创建父级容器
-            const container = document.createElement("div");
-            addStyles(container, basicsStyles);
-            container.style.backgroundColor = uiInputContainerBackgroundColor;
-            container.style.lineHeight = "2em";
-
-            // 创建提示标签
-            const inputLabel = document.createElement("label");
-            inputLabel.textContent = label;
-            addStyles(inputLabel, basicsStyles);
-            inputLabel.style.marginTop = "0.5em";
-
-            // 创建输入框
-            const inputBox = document.createElement("input");
-            inputBox.type = "checkbox";
-            inputBox.id = blockedParameterObjectKey;
-            inputBox.checked = blockedParameterObject[blockedParameterObjectKey];
-            inputBox.spellcheck = false;
-            addStyles(inputBox, basicsStyles);
-            inputBox.style.backgroundColor = uiInputBoxBackgroundColor;
-            inputBox.style.margin = "0";
-
-            // 组合元素
-            container.appendChild(inputLabel);
-            container.appendChild(inputBox);
-
-            return container;
-        }
-    }
-
-    // 创建各个变量参数输入框和按钮
-    const blockedTitleInput = createInputModule(
-        "按标题屏蔽 (支持正则)",
-        blockedParameter,
-        "blockedTitleArray",
-        "Array"
-    );
-    const blockedNamesInput = createInputModule(
-        "按UP名称或UID屏蔽",
-        blockedParameter,
-        "blockedNameOrUidArray",
-        "Array"
-    );
-    const blockedTagsInput = createInputModule("按标签屏蔽 (支持正则)", blockedParameter, "blockedTagArray", "Array");
-    const doubleBlockedTagsInput = createInputModule(
-        '按双重标签屏蔽 (以"A标签|B标签"的格式来添加，支持正则)',
-        blockedParameter,
-        "doubleBlockedTagArray",
-        "Array"
-    );
-    const blockedShortDurationInput = createInputModule(
-        "按时间短于指定秒数视频屏蔽 (0为不生效)",
-        blockedParameter,
-        "blockedShortDuration",
-        "Number"
-    );
-    const hideVideoModeSwitchInput = createInputModule(
-        "隐藏视频而不是使用叠加层覆盖",
-        blockedParameter,
-        "hideVideoModeSwitch",
-        "Bool"
-    );
-    const consoleOutputLogSwitchInput = createInputModule(
-        "控制台输出日志开关",
-        blockedParameter,
-        "consoleOutputLogSwitch",
-        "Bool"
-    );
-
-    // 创建菜单按钮的辅助函数
-    function createMenuButton(label, clickFunction) {
-        // 创建添加按钮
-        const menuButton = document.createElement("button");
-        menuButton.textContent = label;
-        menuButton.addEventListener("click", clickFunction);
-        addStyles(menuButton, basicsStyles);
-        menuButton.style.backgroundColor = uiButtonColor;
-        menuButton.style.padding = "0.5em";
-        menuButton.style.marginBottom = "0";
-        menuButton.style.marginRight = "0.5em";
-
-        return menuButton;
-    }
-
-    // 创建菜单按钮
-    const closeButton = createMenuButton("关闭", closeButtonClickFunction);
-    // 使用 () => 闭包来在 createMenuButton 函数内部传递带参数的 saveButtonClickFunction。
-    const saveButton = createMenuButton("保存", () => saveButtonClickFunction(blockedParameter));
-    const refreshButton = createMenuButton("读取", () => refreshButtonClickFunction(blockedParameter));
-    const saveAndCloseButton = createMenuButton("保存并关闭", () => saveAndCloseButtonClickFunction(blockedParameter));
-
-    // 创建菜单按钮父级容器
-    const menuButtonContainer = document.createElement("div");
-    menuButtonContainer.id = "menuButtonContainer";
-    addStyles(menuButtonContainer, basicsStyles);
-    menuButtonContainer.style.padding = "0";
-    menuButtonContainer.style.margin = "0";
-
-    // 把菜单按钮 添加到 菜单按钮父级容器里
-    menuButtonContainer.appendChild(closeButton);
-    menuButtonContainer.appendChild(saveButton);
-    menuButtonContainer.appendChild(refreshButton);
-    menuButtonContainer.appendChild(saveAndCloseButton);
-
-    // 将所有元素添加到弹窗中
-    menuContent.appendChild(title);
-    menuContent.appendChild(blockedTitleInput);
-    menuContent.appendChild(blockedNamesInput);
-    menuContent.appendChild(blockedTagsInput);
-    menuContent.appendChild(doubleBlockedTagsInput);
-    menuContent.appendChild(blockedShortDurationInput);
-    menuContent.appendChild(hideVideoModeSwitchInput);
-    menuContent.appendChild(consoleOutputLogSwitchInput);
-    menuContent.appendChild(menuButtonContainer);
-
-    // 将弹窗添加到页面
-    document.body.appendChild(menuContent);
-}
-
-// 添加按钮对应的点击函数
-function addButtonClickFunction() {
-    // 使用 event.target 获取触发事件的按钮
-    const clickedButton = event.target;
-
-    // 将获取上一兄弟元素的值，既为 inputBox 输入框 的值
-    const inputBox = clickedButton.previousElementSibling.value;
-
-    // 将获取下一兄弟元素，既为 inputMultiLineDisplayBox 已有数据的多行展示框 的值
-    const inputMultiLineDisplayBox = clickedButton.nextElementSibling.value;
-
-    if (inputMultiLineDisplayBox === "") {
-        // 如果多行展示框为空
-        clickedButton.nextElementSibling.value = inputBox;
+    // 检查页面中是否已经存在这个元素
+    if (!document.getElementById("blockedMenuUi")) {
+        // 如果不存在，将菜单弹窗添加到页面
+        // 创建Div作为菜单容器
+        let menuUi = document.createElement("div");
+        menuUi.innerHTML = menuUiHTML;
+        document.body.appendChild(menuUi);
     } else {
-        // 如果多行展示框不为空，则在前面添加逗号并返回拼接后的字符串
-        clickedButton.nextElementSibling.value = inputMultiLineDisplayBox.concat(",", inputBox);
+        console.log("菜单 #blockedMenuUi 已存在");
+        return;
     }
 
-    // 清空输入框
-    clickedButton.previousElementSibling.value = "";
-}
+    // 让油猴脚本的Vue代码能网页中正常工作。
+    unsafeWindow.Vue = Vue;
 
-// 关闭按钮对应的点击函数
-function closeButtonClickFunction() {
-    // 获取需要删除的元素
-    let elementToRemove = document.getElementById("blockedMenuUi");
+    const { createApp, reactive, toRaw } = Vue;
 
-    // 确保元素存在再进行删除操作
-    if (elementToRemove) {
-        // 先获取父元素
-        var parentElement = elementToRemove.parentNode;
+    createApp({
+        setup() {
+            // 设置选项数据
+            const menuUiSettings = reactive({});
 
-        // 在父元素删除指定的元素
-        parentElement.removeChild(elementToRemove);
-    }
-}
+            // 临时存储的各数组对应的输入值
+            const tempInputValue = reactive({
+                blockedTitle_Array: "",
+                blockedNameOrUid_Array: "",
+                blockedVideoPartitions_Array: "",
+                blockedTag_Array: "",
+                doubleBlockedTag_Array: "",
+                whitelistNameOrUid_Array: "",
+                // 临时提示文本
+                promptText_Switch: true,
+                promptText_Opacity: 0,
+                promptText: "",
+            });
 
-// 保存按钮对应的点击函数 （把 多行展示框 里面的东西 写进 blockedParameter）
-function saveButtonClickFunction(blockedParameterObject) {
-    // 获取在 blockedMenuUi 菜单UI下，所有带有ID的元素
-    let inputIdItem = document.querySelectorAll("#blockedMenuUi > div >[id]");
-
-    // 遍历处理ID元素
-    for (const item of inputIdItem) {
-        // 双重屏蔽标签 的 多行展示框 内容要特殊处理
-        if (item.id == "doubleBlockedTagArray") {
-            // 处理特殊的双重屏蔽字符串
-            function processDoubleBlockedTagString(inputString) {
-                // 使用逗号分割字符串
-                const items = inputString.split(",");
-
-                // 过滤并处理每个项
-                const processedArray = items
-                    .map((item) => {
-                        // 去除项两端的空格
-                        const trimmedItem = item.trim();
-
-                        // 判断项中是否包含 "|"，且 "|" 的数量为1 (分割后有两份),且不为空值
-                        const secondSplitItem = trimmedItem.split("|").filter((value) => value !== "");
-                        if (secondSplitItem.length === 2) {
-                            // 去除空格，并拼接成最终的项
-                            const formattedItem = secondSplitItem.map((str) => str.trim()).join("|");
-                            return formattedItem;
-                        } else {
-                            // 如果不包含 "|" 或者 "|" 数量不为1，返回 null（后续过滤）
-                            return null;
-                        }
-                    })
-                    .filter((item) => item !== null); // 过滤掉为 null 的项
-
-                return processedArray;
+            function showPromptText(text) {
+                // tempInputValue.promptText_Switch = true; // 显示 label 元素
+                tempInputValue.promptText_Opacity = 1;
+                tempInputValue.promptText = text;
+                // 1.5秒后隐藏 label 元素
+                setTimeout(() => {
+                    // tempInputValue.promptText_Switch = false;
+                    tempInputValue.promptText_Opacity = 0;
+                }, 1500);
             }
 
-            blockedParameterObject[item.id] = processDoubleBlockedTagString(item.value);
+            // 添加数组项目
+            const addArrayButton = (tempInputValue, menuUiSettings, keyName) => {
+                // 双重标签的特殊处理 判断是否为空
+                if (keyName == "doubleBlockedTag_Array" && tempInputValue[keyName].trim()) {
+                    // 使用 split 按逗号分隔，然后映射去除每个标签的首尾空白
+                    const items = tempInputValue[keyName]
+                        .split(",")
+                        .map((item) => item.split("|").map((str) => str.trim()))
+                        .filter((subArray) => subArray.length === 2 && subArray.every((str) => str !== ""));
 
-            continue;
-        }
+                    items.forEach((secondSplitItem) => {
+                        // 将两个标签重新组合成一个字符串，并添加到设置数据中
+                        const formattedItem = secondSplitItem.join("|");
+                        menuUiSettings[keyName].push(formattedItem);
+                    });
 
-        // 多行展示框 数据
-        if (item.type == "textarea") {
-            // 多行展示框 的数据存入 blockedParameter
-            blockedParameterObject[item.id] = item.value
-                .split(",")
-                .filter((value) => value !== "")
-                .map((str) => str.trim());
-        }
+                    // 清空输入框内容
+                    tempInputValue[keyName] = "";
 
-        // 数值类输入框
-        if (item.type == "number") {
-            function convertToNumber(str) {
-                const parsedNumber = parseInt(str, 10); // 第二个参数表示使用十进制转换
-                return isNaN(parsedNumber) ? 0 : parsedNumber;
+                    return;
+                }
+
+                // 判断是否为空
+                if (tempInputValue[keyName].trim()) {
+                    // 用逗号分隔值并去除每项的空格后添加到数组
+                    const items = tempInputValue[keyName].split(",").map((item) => item.trim());
+
+                    menuUiSettings[keyName].push(...items);
+
+                    // 清空输入框内容
+                    tempInputValue[keyName] = "";
+                }
+            };
+
+            //删除数组项目
+            const delArrayButton = (index, array) => {
+                //splice(要删除元素的索引位置, 要删除的元素数量)
+                array.splice(index, 1);
+            };
+
+            // 读取按钮 深拷贝函数，递归处理嵌套对象，普通对象 to 普通对象/响应式对象
+            function deepCopy(source, target) {
+                for (let key in source) {
+                    if (typeof source[key] === "object" && source[key] !== null) {
+                        target[key] = Array.isArray(source[key]) ? [] : {}; // 根据类型创建空对象或数组
+                        deepCopy(source[key], target[key]); // 递归拷贝子对象
+                    } else {
+                        target[key] = source[key]; // 复制基本类型和函数等
+                    }
+                }
             }
 
-            // 多行展示框 的数据存入 blockedParameter
-            blockedParameterObject[item.id] = convertToNumber(item.value);
-        }
+            // 读取按钮
+            const refreshButton = () => {
+                // 使用 deepCopy 函数进行深拷贝
+                deepCopy(blockedParameter, menuUiSettings);
 
-        // 布尔类的输入框
-        if (item.type == "checkbox") {
-            blockedParameterObject[item.id] = item.checked;
-        }
-    }
+                showPromptText("读取数据");
+            };
 
-    // 将全局屏蔽参数对象变量 blockedParameter 保存到油猴扩展存储中
-    GM_setValue("GM_blockedParameter", blockedParameterObject);
+            // 保存按钮 深拷贝函数，递归处理响应式对象，响应式对象 to 普通对象
+            function deepCopyReactiveObject(reactiveObj, targetObj) {
+                for (let key in reactiveObj) {
+                    const rawValue = toRaw(reactiveObj[key]); // 获取属性的原始值
 
-    // 触发刷新(读取)函数，通知为 false
-    refreshButtonClickFunction(blockedParameterObject, false);
+                    if (typeof rawValue === "object" && rawValue !== null) {
+                        targetObj[key] = Array.isArray(rawValue) ? [] : {}; // 根据类型创建空对象或数组
+                        deepCopyReactiveObject(rawValue, targetObj[key]); // 递归处理嵌套的响应式子对象
+                    } else {
+                        targetObj[key] = rawValue; // 复制基本类型和函数等
+                    }
+                }
+            }
 
-    showFloatingReminder("内容已保存");
-}
+            // 保存按钮
+            const saveButton = () => {
+                // 将响应式对象深拷贝到普通对象 blockedParameter
+                deepCopyReactiveObject(menuUiSettings, blockedParameter);
 
-// 读取按钮对应的点击函数（把 油猴扩展存储 读取到 blockedParameter 读取到 多行展示框）
-function refreshButtonClickFunction(blockedParameterObject, enableMessage = true) {
-    // 油猴扩展存储 读取到 blockedParameter
-    blockedParameterObject = GM_getValue("GM_blockedParameter", {
-        // 屏蔽标题数组
-        blockedTitleArray: [],
-        // 屏蔽UP主或者Uid数组
-        blockedNameOrUidArray: [],
-        // 屏蔽标签数组
-        blockedTagArray: [],
-        // 双重屏蔽标签数组
-        doubleBlockedTagArray: [],
-        // 屏蔽短时长视频(0为不生效)
-        blockedShortDuration: 0,
-        // 隐藏视频模式
-        hideVideoModeSwitch: false,
-        // 启用日志输出
-        consoleOutputLogSwitch: false,
-    });
+                // 将全局屏蔽参数对象变量 blockedParameter 保存到油猴扩展存储中
+                GM_setValue("GM_blockedParameter", blockedParameter);
 
-    // 获取在 blockedMenuUi 菜单UI下，所有带有ID的元素
-    let inputIdItem = document.querySelectorAll("#blockedMenuUi > div >[id]");
+                showPromptText("保存数据");
 
-    // 把 blockedParameter 的数据 写到对应的 UI输入框
-    for (let item of inputIdItem) {
-        if (item.type == "textarea") {
-            item.value = blockedParameterObject[item.id].join(",");
-        }
+                // 触发一次主函数，以立刻生效
+                FuckYouBilibiliRecommendationSystem();
+            };
 
-        if (item.type == "number") {
-            item.value = blockedParameterObject[item.id];
-        }
+            // 关闭按钮
+            const closeButton = () => {
+                // 获取需要删除的元素
+                let elementToRemove = document.getElementById("blockedMenuUi");
 
-        if (item.type == "checkbox") {
-            item.checked = blockedParameterObject[item.id];
-        }
-    }
+                // 确保元素存在再进行删除操作
+                if (elementToRemove) {
+                    // 先获取父元素
+                    let parentElement = elementToRemove.parentNode;
 
-    // 保存按钮 saveButtonClickFunction 保存后，会触发一次 refreshButtonClickFunction，不需要两个都弹出提示框
-    if (enableMessage) {
-        showFloatingReminder("内容已刷新");
-    }
-}
+                    // 在父元素删除指定的元素
+                    parentElement.removeChild(elementToRemove);
+                }
+            };
 
-// 保存并关闭按钮对应的点击函数，分别触发保存和关闭按钮
-function saveAndCloseButtonClickFunction(blockedParameterObject) {
-    saveButtonClickFunction(blockedParameterObject);
+            // 作者主页
+            const authorButton = () => {
+                setTimeout(() => {
+                    window.open("https://space.bilibili.com/351422438", "_blank");
+                }, 1000);
+                showPromptText("欢迎关注！");
+            };
 
-    closeButtonClickFunction();
-}
+            // 赞助作者
+            const supportButton = () => {
+                setTimeout(() => {
+                    window.open("https://afdian.net/a/tjxgame", "_blank");
+                }, 1000);
+                showPromptText("感谢老板！");
+            };
 
-// 菜单按钮按下的提醒消息
-function showFloatingReminder(message) {
-    const element = document.querySelector("#menuButtonContainer");
+            // 打开菜单时，先加载一次数据
+            refreshButton();
 
-    // 创建提醒元素
-    const reminderElement = document.createElement("div");
-    reminderElement.textContent = message;
-    addStyles(reminderElement, basicsStyles);
-    reminderElement.style.backgroundColor = uiPromptBoxColor;
-    reminderElement.style.padding = "0.5em";
-    reminderElement.style.marginBottom = "0";
-    reminderElement.style.float = "right";
-    reminderElement.style.bottom = "1em";
-    reminderElement.style.right = "1em";
-
-    // 将提醒元素添加到指定的元素内
-    element.appendChild(reminderElement);
-
-    // 3秒后移除提醒元素
-    setTimeout(() => {
-        element.removeChild(reminderElement);
-    }, 3000);
+            return {
+                menuUiSettings,
+                tempInputValue,
+                addArrayButton,
+                delArrayButton,
+                refreshButton,
+                saveButton,
+                closeButton,
+                supportButton,
+                authorButton,
+            };
+        },
+    }).mount("#blockedMenuUi");
 }
 
 // 在油猴扩展中添加脚本菜单选项
@@ -529,53 +811,122 @@ GM_registerMenuCommand("屏蔽参数面板", blockedMenuUi);
 // 视频的临时详细信息对象，以videoBv为键, 用于同窗口内的缓存查询
 let videoInfoDict = {};
 
-// 日志输出, 创建一个包装函数，根据 consoleOutputLogSwitch 标志来决定是否输出日志
+// videoInfoDict 的参考内容结构
+// videoInfoDict = {
+//     BV12i4y1e73B: {
+//         videoLink: "https://www.bilibili.com/video/BV12i4y1e73B/",
+//         videoTitle: "B站按 标签 标题 时长 UP主来屏蔽视频 油猴插件【tjxgame】",
+//         videoUpUid: 351422438,
+//         videoUpName: "tjxgame",
+//         lastVideoInfoApiRequestTime: "2024-06-21T09:17:10.389Z",
+//         lastVideoTagApiRequestTime: "2024-06-21T09:17:10.389Z",
+//         videoDuration: 259,
+//         videoPartitions: "软件应用",
+//         videoView: 9067,
+//         videoLike: 507,
+//         videoLikesRate: "5.59",
+//         videoResolution: {
+//             width: 3840,
+//             height: 2160,
+//         },
+//         videoTags: [
+//             "科技2023年终总结",
+//             "视频",
+//             "教程",
+//             "tjxwork",
+//             "软件分享",
+//             "插件",
+//             "标签",
+//             "屏蔽",
+//             "油猴",
+//             "tjxgame",
+//             "2023热门年度盘点",
+//         ],
+//         blockedTarget: true,
+//         triggeredBlockedRules: [
+//             "屏蔽短时长视频: 259秒",
+//             "屏蔽低播放量: 9067次",
+//             "屏蔽低点赞率: 5.59%",
+//             "屏蔽标题: tjxgame",
+//             "屏蔽UP: tjxgame",
+//             "屏蔽分区: 软件应用",
+//             "屏蔽标签: 标签",
+//             "屏蔽双重标签: 油猴,插件",
+//         ],
+//         whiteListTargets: true,
+//     },
+// };
+
+// 日志输出，根据 consoleOutputLog_Switch 标志来决定是否输出日志
 function consoleLogOutput(...args) {
-    if (blockedParameter.consoleOutputLogSwitch) {
+    // 启用控制台日志输出
+    if (blockedParameter.consoleOutputLog_Switch) {
         // 获取当前时间的时分秒毫秒部分
-        var now = new Date();
-        var hours = now.getHours().toString().padStart(2, "0");
-        var minutes = now.getMinutes().toString().padStart(2, "0");
-        var seconds = now.getSeconds().toString().padStart(2, "0");
-        var milliseconds = now.getMilliseconds().toString().padStart(3, "0");
+        let now = new Date();
+        let hours = now.getHours().toString().padStart(2, "0");
+        let minutes = now.getMinutes().toString().padStart(2, "0");
+        let seconds = now.getSeconds().toString().padStart(2, "0");
+        let milliseconds = now.getMilliseconds().toString().padStart(3, "0");
 
         // 将时间信息添加到日志消息中
-        var logTime = `${hours}:${minutes}:${seconds}.${milliseconds}`;
+        let logTime = `${hours}:${minutes}:${seconds}.${milliseconds}`;
 
         // 合并时间信息和 args 成为一个数组
-        var logArray = [logTime, ...args];
+        let logArray = [logTime, ...args];
         console.log(...logArray);
     }
 }
 
 // 获取视频元素
 function getVideoElements() {
+    // // 获取所有有可能是视频元素的标签 （BewlyBewly插件的首页特殊处理）
+    // let bewlyBewly = document.getElementById("bewly");
+    // if (bewlyBewly) {
+
+    //     // BewlyBewly插件使用shadowDOM，要在shadowDOM下面找元素
+    //     let shadowRoot = bewlyBewly.shadowRoot;
+    //     videoElements = shadowRoot.querySelectorAll("div.video-card.group");
+
+    //     // 过滤掉没有包含a标签的元素
+    //     videoElements = Array.from(videoElements).filter((element) => element.querySelector("a"));
+
+    //     // 返回处理后的结果
+    //     return videoElements;
+    // }
+    // BewlyBewly 更新后失效……
+
     // 获取所有有可能是视频元素的标签
-    var videoElements = document.querySelectorAll(
+    let videoElements = document.querySelectorAll(
         // div.bili-video-card 首页(https://www.bilibili.com/)、分区首页(https://www.bilibili.com/v/*)、搜索页面(https://search.bilibili.com/*)
         // div.video-page-card-small 播放页右侧推荐(https://www.bilibili.com/video/BV****)
         // li.bili-rank-list-video__item 分区首页-子分区右侧热门(https://www.bilibili.com/v/*)
         // div.video-card 综合热门(https://www.bilibili.com/v/popular/all) 、每周必看(https://www.bilibili.com/v/popular/weekly) 、入站必刷(https://www.bilibili.com/v/popular/history)
+        // li.rank-item 排行榜(https://www.bilibili.com/v/popular/rank/all)
         // div.video-card-reco 旧版首页推送(https://www.bilibili.com/)
         // div.video-card-common 旧版首页分区(https://www.bilibili.com/)
         // div.rank-wrap 旧版首页分区右侧排行(https://www.bilibili.com/)
-        "div.bili-video-card, div.video-page-card-small, li.bili-rank-list-video__item, div.video-card, div.video-card-reco, div.video-card-common, div.rank-wrap"
+        "div.bili-video-card, div.video-page-card-small, li.bili-rank-list-video__item, div.video-card, li.rank-item, div.video-card-reco, div.video-card-common, div.rank-wrap"
     );
 
     // 过滤掉没有包含a标签的元素
     videoElements = Array.from(videoElements).filter((element) => element.querySelector("a"));
 
+    // 过滤掉 CSS类刚好为 'bili-video-card is-rcmd' 的元素，因为是广告。
+    videoElements = Array.from(videoElements).filter(
+        (element) => element.classList.value !== "bili-video-card is-rcmd"
+    );
+
     // 返回处理后的结果
     return videoElements;
 }
 
-// 判断是否为已经屏蔽处理过的子元素
+// 判断是否为已经屏蔽处理过的视频元素（延迟处理中）
 function isAlreadyBlockedChildElement(videoElement) {
-    // 确认是否为已经修改 元素已隐藏 跳过
-    if (videoElement.style.display == "none") {
-        // consoleLogOutput(operationInfo, "元素已隐藏 跳过剩下主函数步骤");
-        return true;
-    }
+    // // 确认是否为已经修改 元素已隐藏 跳过
+    // if (videoElement.style.display == "none") {
+    //     // consoleLogOutput(operationInfo, "元素已隐藏 跳过剩下主函数步骤");
+    //     return true;
+    // }
 
     // 确认是否为已经修改 元素已透明 延迟处理中 跳过
     if (videoElement.style.filter == "blur(5px)") {
@@ -583,14 +934,33 @@ function isAlreadyBlockedChildElement(videoElement) {
         return true;
     }
 
-    // 获取子元素，以确认是否为已经修改
-    if (videoElement.firstElementChild.className == "blockedOverlay") {
-        // consoleLogOutput(videoElement, "获取子元素，确认是已屏蔽处理过，跳过剩下主函数步骤");
-        return true;
+    // // 获取子元素，以确认是否为已经修改
+    // if (videoElement.firstElementChild.className == "blockedOverlay") {
+    //     // consoleLogOutput(videoElement, "获取子元素，确认是已屏蔽处理过，跳过剩下主函数步骤");
+    //     return true;
+    // }
+}
+
+// 标记为屏蔽目标，并记录命中的规则
+function markAsBlockedTarget(videoBv, blockedType, blockedItem) {
+    // 将该 Bv号 标记为屏蔽目标
+    videoInfoDict[videoBv].blockedTarget = true;
+
+    // 确保 videoInfoDict[videoBv].triggeredBlockedRules 已定义为数组
+    if (!videoInfoDict[videoBv].triggeredBlockedRules) {
+        videoInfoDict[videoBv].triggeredBlockedRules = [];
+    }
+
+    let blockedRulesItem = blockedType + ": " + blockedItem;
+
+    // 检查是否已经这条记录
+    if (!videoInfoDict[videoBv].triggeredBlockedRules.includes(blockedRulesItem)) {
+        // 将触发屏蔽的原因添加到 videoInfoDict[videoBv].triggeredBlockedRules
+        videoInfoDict[videoBv].triggeredBlockedRules.push(blockedRulesItem);
     }
 }
 
-// 获取视频元素的Bv号和标题
+// 网页获取视频元素的Bv号和标题
 function getBvAndTitle(videoElement) {
     // 从视频元素中获取所有a标签链接
     const videoLinkElements = videoElement.querySelectorAll("a");
@@ -600,36 +970,27 @@ function getBvAndTitle(videoElement) {
 
     // 循环处理所有a标签链接
     for (let videoLinkElement of videoLinkElements) {
-        // 如果a标签中没有字符，跳过剩余语句，开始下一次循环
-        // if (!videoLinkElement.textContent) {
-        //     continue;
-        // }
-
-        // 如果a标签中的字符有"稍后再看"，跳过剩余语句，开始下一次循环
-        if (/稍后再看/.test(videoLinkElement.textContent)) {
+        // 处理排行榜的多链接特殊情况，符合就跳过
+        if (videoLinkElement.className == "other-link") {
             continue;
         }
 
-        // 获取的链接，如果与Bv链接的格式匹配的话
-        let bvTemp = videoLinkElement.href.match(/\/(BV\w+)/);
-        if (bvTemp) {
-            // 视频Bv号
-            videoBv = bvTemp[1];
-            consoleLogOutput(videoBv, "此BV号来源于", videoElement);
-
-            // 确保 videoInfoDict[videoBv] 已定义
-            if (!videoInfoDict[videoBv]) {
-                videoInfoDict[videoBv] = {};
-            }
-
-            // 视频链接
-            videoInfoDict[videoBv].videoLink = videoLinkElement.href;
-            consoleLogOutput(videoBv, "网页上获取的链接: ", videoInfoDict[videoBv].videoLink);
-
-            // // 视频标题
-            // videoInfoDict[videoBv].videoTitle = videoLinkElement.textContent;
-            // consoleLogOutput(videoBv, "网页上获取的标题: ", videoInfoDict[videoBv].videoTitle);
+        // 获取的链接，如果与Bv链接的格式不匹配的话，就跳过
+        let videoBvTemp = videoLinkElement.href.match(/\/(BV\w+)/);
+        if (!videoBvTemp) {
+            continue;
         }
+
+        // 从链接中获取到 视频Bv号
+        videoBv = videoBvTemp[1];
+
+        // 确保 videoInfoDict[videoBv] 已定义
+        if (!videoInfoDict[videoBv]) {
+            videoInfoDict[videoBv] = {};
+        }
+
+        // 视频链接
+        videoInfoDict[videoBv].videoLink = videoLinkElement.href;
     }
 
     // 没有拿到Bv号，提前结束
@@ -638,165 +999,60 @@ function getBvAndTitle(videoElement) {
         return false;
     }
 
-
     // 视频标题 , 从视频元素中获取第一个带 title 属性且不为 span 的标签
-    videoInfoDict[videoBv].videoTitle = videoElement.querySelector('[title]:not(span)').title;
-    consoleLogOutput(videoBv, "网页上获取的标题: ", videoInfoDict[videoBv].videoTitle);
-    
+    videoInfoDict[videoBv].videoTitle = videoElement.querySelector("[title]:not(span)").title;
+
     return videoBv;
 }
 
-// 判断处理匹配的屏蔽标题
-function handleBlockedTitle(videoElement, videoBv) {
-    // 使用 屏蔽标题数组 与 视频标题 进行匹配
-    const blockedTitleFind = blockedParameter.blockedTitleArray.find((blockedTitle) => {
-        const blockedTitleRegEx = new RegExp(blockedTitle);
-        if (blockedTitleRegEx.test(videoInfoDict[videoBv].videoTitle)) {
-            return blockedTitle;
+// 处理匹配的屏蔽标题
+function handleBlockedTitle(videoBv) {
+    // 判断是否拿到视频标题
+    if (!videoInfoDict[videoBv].videoTitle) {
+        return;
+    }
+
+    // 记录触发的规则内容
+    // let blockedRulesItemText = "";
+
+    // 是否启用正则
+    if (blockedParameter.blockedTitle_UseRegular) {
+        // 使用 屏蔽标题数组 与 视频标题 进行匹配
+        const blockedTitleHitItem = blockedParameter.blockedTitle_Array.find((blockedTitleItem) => {
+            // 正则化屏蔽标题
+            const blockedTitleRegEx = new RegExp(blockedTitleItem);
+            // 判断 正则化的屏蔽标题 是否匹配 视频标题
+            if (blockedTitleRegEx.test(videoInfoDict[videoBv].videoTitle)) {
+                // blockedRulesItemText = videoInfoDict[videoBv].videoTitle;
+                return true;
+            }
+        });
+
+        if (blockedTitleHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽标题", blockedTitleHitItem);
         }
-    });
-    if (blockedTitleFind) {
-        createOverlay(`屏蔽标题: ${blockedTitleFind}`, videoElement, `${videoBv} handleBlockedTitle()`);
-        consoleLogOutput(videoBv, "handleBlockedTitle() 已屏蔽视频元素 跳过剩下主函数步骤");
-        return true;
-    }
-}
-
-// 时分秒 转 秒 辅助函数
-function timeToSeconds(timeString) {
-    // 将时间字符串按冒号分割
-    const timeArray = timeString.split(":");
-
-    // 从数组的末尾开始计算秒数
-    let seconds = 0;
-    let multiplier = 1;
-
-    for (let i = timeArray.length - 1; i >= 0; i--) {
-        seconds += parseInt(timeArray[i]) * multiplier;
-        multiplier *= 60; // 每遍历一个单位，乘以60，转为秒
-    }
-
-    return seconds;
-}
-
-// 获取视频元素的时长
-function getDuration(videoElement, videoBv) {
-    // 如果已经有 BV号 对应的 记录，跳过
-    if (videoInfoDict[videoBv].videoDuration) {
-        consoleLogOutput(videoBv, "getDuration() 在 videoInfoDict 中，找到对应的 视频时长 记录");
-        return;
-    }
-
-    // 从视频元素中获取视频元素
-    const timeStringElement = videoElement.querySelector("span.bili-video-card__stats__duration, span.duration");
-
-    if (timeStringElement) {
-        const timeStringTemp = timeStringElement.textContent;
-        videoInfoDict[videoBv].videoDuration = timeToSeconds(timeStringTemp);
-
-        consoleLogOutput(
-            videoBv,
-            "getDuration() 已成功在网页上获取 视频时长",
-            videoInfoDict[videoBv].videoDuration,
-            "秒"
-        );
     } else {
-        consoleLogOutput(videoBv, "getDuration() 在没有在网页中找到 视频时长 元素");
-    }
+        // 使用 屏蔽标题数组 与 视频标题 进行匹配
+        const blockedTitleHitItem = blockedParameter.blockedTitle_Array.find((blockedTitleItem) => {
+            // 判断 屏蔽标题 是否匹配 视频标题
+            if (blockedTitleItem === videoInfoDict[videoBv].videoTitle) {
+                // blockedRulesItemText = videoInfoDict[videoBv].videoTitle;
+                return true;
+            }
+        });
 
-    //获取当前时间
-    const currentTime = new Date();
-
-    // 当 lastTimeApiVideoInfo 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
-    if (
-        videoInfoDict[videoBv].lastTimeApiVideoInfo &&
-        currentTime - videoInfoDict[videoBv].lastTimeApiVideoInfo < 3000
-    ) {
-        consoleLogOutput(videoBv, "getDuration() 距离上次 Fetch 获取视频信息还未超过3秒钟");
-        return;
-    }
-
-    videoInfoDict[videoBv].lastTimeApiVideoInfo = currentTime;
-
-    // 通过API获取视频UP信息
-    fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${videoBv}`)
-        .then((response) => response.json())
-        .then((videoApiInfoJson) => {
-            let returnMessage = videoApiInfoJson.message;
-            consoleLogOutput(videoBv, "getDuration() Fetch:返回的消息: ", returnMessage);
-
-            videoInfoDict[videoBv].videoUpUid = videoApiInfoJson.data.owner.mid;
-            consoleLogOutput(videoBv, "getDuration() API获取的UP主Uid: ", videoInfoDict[videoBv].videoUpUid);
-
-            videoInfoDict[videoBv].videoUpName = videoApiInfoJson.data.owner.name;
-            consoleLogOutput(videoBv, "getDuration() API获取的UP主名称: ", videoInfoDict[videoBv].videoUpName);
-
-            videoInfoDict[videoBv].videoDuration = videoApiInfoJson.data.duration;
-            consoleLogOutput(videoBv, "getDuration() API获取的视频时长: ", videoInfoDict[videoBv].videoDuration, "秒");
-
-            // videoInfoDict[videoBv].videoWidth = videoApiInfoJson.data.dimension.width;
-            // videoInfoDict[videoBv].videoHeight = videoApiInfoJson.data.dimension.height;
-            // consoleLogOutput(videoBv, "getDuration() API获取的视频分辨率: ", videoInfoDict[videoBv].videoWidth ,"x", videoInfoDict[videoBv].videoHeight);
-
-            // videoInfoDict[videoBv].videoDesc = videoApiInfoJson.data.desc;
-            // consoleLogOutput(videoBv, "getDuration() API获取的视频简介: ", videoInfoDict[videoBv].videoUpName);
-            
-            // 尝试在fetch异步结束后直接屏蔽处理 匹配的短时长视频
-            handleBlockedShortDuration(videoElement, videoBv, true);
-
-            // 为了减少 API 调用，限制了短时间不能重复调用API，getDuration() 和 getUpNameAndUpUid() 实际是使用的同一个API
-            // 在同时需求API 查询 视频时长 和 视频UP主名称 时，getDuration() 没来得及返回信息到videoInfoDict的情况下，
-            // getUpNameAndUpUid() 没有从videoInfoDict里拿到信息，会重新发起 API ，但是这没有必要，getDuration() 的信息是一样的。
-            // getDuration() 和 getUpNameAndUpUid() 会共用同一个时间标记 lastTimeApiVideoInfo 来限制同Bv号的查询频率，
-            // 并将 handleBlockedUpNameOrUpUid() 操作复制到一份到 getDuration() 下，等待 fetch 结束后运行。
-
-            // 尝试在fetch异步结束后直接屏蔽处理 匹配的屏蔽Up主名称或Up主Uid
-            handleBlockedUpNameOrUpUid(videoElement, videoBv, true);
-        })
-        .catch((error) => console.error(videoBv, "getDuration() Fetch错误:", error));
-
-    // 判断是否成功拿到 BV号 对应的 Up主名称 Up主Uid 记录
-    if (videoInfoDict[videoBv].videoUpUid && videoInfoDict[videoBv].videoUpName) {
-        consoleLogOutput(videoBv, "getDuration() 已成功在API上获取 UP主名称 UP主UID 视频时长");
-        return;
-    } else {
-        consoleLogOutput(videoBv, "getDuration() 暂时未获取 UP主名称 UP主UID 视频时长");
-        return;
-    }
-}
-
-// 判断处理匹配的短时长视频
-function handleBlockedShortDuration(videoElement, videoBv, withinFetch = false) {
-    if (!videoInfoDict[videoBv].videoDuration) {
-        consoleLogOutput(videoBv, "handleBlockedShortDuration() 未获取到 视频时长，放弃执行");
-        return;
-    }
-    // 匹配短时长视频
-    if (videoInfoDict[videoBv].videoDuration < blockedParameter.blockedShortDuration) {
-        createOverlay(
-            `屏蔽短于${blockedParameter.blockedShortDuration}秒时长视频`,
-            videoElement,
-            `${videoBv} handleBlockedShortDuration()`
-        );
-
-        if (withinFetch) {
-            consoleLogOutput(
-                videoBv,
-                "在 getDuration() 的 Fetch 内执行 handleBlockedShortDuration() 已屏蔽 短时长视频"
-            );
-        } else {
-            consoleLogOutput(videoBv, "handleBlockedShortDuration() 已屏蔽 短时长视频，跳过剩下主函数步骤");
+        if (blockedTitleHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽标题", blockedTitleHitItem);
         }
-
-        return true;
     }
 }
 
-// 获取视频元素的Up主名称 Up主Uid
-function getUpNameAndUpUid(videoElement, videoBv) {
+// 网页获取视频UP名和UpUid (已经有API获取为什么还要网页获取？因为快……)
+function getNameAndUid(videoElement, videoBv) {
     // 如果已经有 BV号 对应的 Up主名称 Up主Uid 记录，跳过
-    if (videoInfoDict[videoBv].videoUpUid && videoInfoDict[videoBv].videoUpName) {
-        consoleLogOutput(videoBv, "getUpNameAndUpUid() 在 videoInfoDict 中，已找到对应的 UP主名称 UP主UID 记录");
+    if (videoInfoDict[videoBv].videoUpName && videoInfoDict[videoBv].videoUpUid) {
         return;
     }
 
@@ -806,376 +1062,711 @@ function getUpNameAndUpUid(videoElement, videoBv) {
     // 循环处理所有a标签链接
     for (let videoLinkElement of videoLinkElements) {
         // 获取的链接，如果与 Uid 的链接格式匹配的话
-        const uidTemp = videoLinkElement.href.match(/space\.bilibili\.com\/(\d+)/);
-
-        if (uidTemp) {
+        const uidLink = videoLinkElement.href.match(/space\.bilibili\.com\/(\d+)/);
+        if (uidLink) {
             // 视频UpUid
-            videoInfoDict[videoBv].videoUpUid = uidTemp[1];
-            consoleLogOutput(videoBv, "网页上获取的UP主UID: ", videoInfoDict[videoBv].videoUpUid);
+            videoInfoDict[videoBv].videoUpUid = uidLink[1];
 
             // 视频Up名称
-            //videoInfoDict[videoBv].videoUpName = videoLinkElement.textContent;
-            //videoInfoDict[videoBv].videoUpName = videoInfoDict[videoBv].videoUpName.replace(/\s?·\s\S*$/, "");
             videoInfoDict[videoBv].videoUpName = videoLinkElement.querySelector("span").innerText;
-
-            consoleLogOutput(videoBv, "网页上获取的UP主名称: ", videoInfoDict[videoBv].videoUpName);
         }
     }
+}
 
-    // 判断是否成功拿到 BV号 对应的 Up主名称 Up主Uid 记录，成功就提前退出
-    if (videoInfoDict[videoBv].videoUpUid && videoInfoDict[videoBv].videoUpName) {
-        consoleLogOutput(videoBv, "getUpNameAndUpUid() 已成功在网页上获取 UP主名称 UP主UID");
+// API获取视频信息
+function getVideoApiInfo(videoBv) {
+    // 如果已经有BV号对应的记录，跳过
+    if (videoInfoDict[videoBv].videoDuration) {
         return;
     }
 
-    //获取当前时间
-    const currentTime = new Date();
-
-    // 当 lastTimeApiVideoInfo 上次API获取视频信息的时间存在，并且，和当前的时间差小于3秒时，跳过
+    // 当 lastVideoInfoApiRequestTime 上次API获取视频信息的时间存在，并且，和当前的时间差小于3秒时，跳过
+    const currentTime = new Date(); //获取当前时间
     if (
-        videoInfoDict[videoBv].lastTimeApiVideoInfo &&
-        currentTime - videoInfoDict[videoBv].lastTimeApiVideoInfo < 3000
+        videoInfoDict[videoBv].lastVideoInfoApiRequestTime &&
+        currentTime - videoInfoDict[videoBv].lastVideoInfoApiRequestTime < 3000
     ) {
-        consoleLogOutput(videoBv, "getUpNameAndUpUid() 距离上次 Fetch 获取视频信息还未超过5秒钟");
+        // consoleLogOutput(videoBv, "getVideoApiInfo() 距离上次 Fetch 获取视频信息还未超过3秒钟");
         return;
     }
+    videoInfoDict[videoBv].lastVideoInfoApiRequestTime = currentTime;
 
-    videoInfoDict[videoBv].lastTimeApiVideoInfo = currentTime;
-
-    // 如果前面的通过网页提取视频UP信息失败，则通过API获取视频UP信息
+    // 通过API获取视频UP信息
     fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${videoBv}`)
         .then((response) => response.json())
         .then((videoApiInfoJson) => {
-            let returnMessage = videoApiInfoJson.message;
-            consoleLogOutput(videoBv, "getUpNameAndUpUid() Fetch:返回的消息: ", returnMessage);
-
-            videoInfoDict[videoBv].videoUpUid = videoApiInfoJson.data.owner.mid;
-            consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的UP主UID: ", videoInfoDict[videoBv].videoUpUid);
-
+            // API获取的UP主名称:
             videoInfoDict[videoBv].videoUpName = videoApiInfoJson.data.owner.name;
-            consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的UP主名称: ", videoInfoDict[videoBv].videoUpName);
 
+            // API获取的UP主Uid:
+            videoInfoDict[videoBv].videoUpUid = videoApiInfoJson.data.owner.mid;
+
+            // API获取的视频时长
             videoInfoDict[videoBv].videoDuration = videoApiInfoJson.data.duration;
-            consoleLogOutput(
-                videoBv,
-                "getUpNameAndUpUid() API获取的视频时长: ",
-                videoInfoDict[videoBv].videoDuration,
-                "秒"
-            );
 
-            // videoInfoDict[videoBv].videoWidth = videoApiInfoJson.data.dimension.width;
-            // videoInfoDict[videoBv].videoHeight = videoApiInfoJson.data.dimension.height;
-            // consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的视频分辨率: ", videoInfoDict[videoBv].videoWidth ,"x", videoInfoDict[videoBv].videoHeight);
+            // API获取的视频分区
+            videoInfoDict[videoBv].videoPartitions = videoApiInfoJson.data.tname;
 
-            // videoInfoDict[videoBv].videoDesc = videoApiInfoJson.data.desc;
-            // consoleLogOutput(videoBv, "getUpNameAndUpUid() API获取的视频简介: ", videoInfoDict[videoBv].videoUpName);
+            // API获取的视频播放数
+            videoInfoDict[videoBv].videoView = videoApiInfoJson.data.stat.view;
 
+            // API获取的视频点赞数
+            videoInfoDict[videoBv].videoLike = videoApiInfoJson.data.stat.like;
 
-            // 尝试在fetch异步结束后直接屏蔽处理 匹配的屏蔽Up主名称或Up主Uid
-            handleBlockedUpNameOrUpUid(videoElement, videoBv, true);
+            // 计算视频点赞率保留2位小数
+            videoInfoDict[videoBv].videoLikesRate = (
+                (videoInfoDict[videoBv].videoLike / videoInfoDict[videoBv].videoView) *
+                100
+            ).toFixed(2);
+
+            // // API获取的视频投币数
+            // videoInfoDict[videoBv].videoCoin = videoApiInfoJson.data.stat.coin;
+
+            // // API获取的视频收藏数
+            // videoInfoDict[videoBv].videoFavorite = videoApiInfoJson.data.stat.favorite;
+
+            // // API获取的视频分享数
+            // videoInfoDict[videoBv].videoShare = videoApiInfoJson.data.stat.share;
+
+            // // API获取的视频评论数
+            // videoInfoDict[videoBv].videoReply = videoApiInfoJson.data.stat.reply;
+
+            // // API获取的视频弹幕数
+            // videoInfoDict[videoBv].videoDanmaku = videoApiInfoJson.data.stat.danmaku;
+
+            // API获取的视频分辨率
+            if (!videoInfoDict[videoBv].videoResolution) {
+                videoInfoDict[videoBv].videoResolution = {};
+            }
+            videoInfoDict[videoBv].videoResolution.width = videoApiInfoJson.data.dimension.width;
+            videoInfoDict[videoBv].videoResolution.height = videoApiInfoJson.data.dimension.height;
+
+            FuckYouBilibiliRecommendationSystem();
         })
-        .catch((error) => console.error(videoBv, "getUpNameAndUpUid() Fetch错误:", error));
-
-    // 判断是否成功拿到 BV号 对应的 Up主名称 Up主Uid 记录
-    if (videoInfoDict[videoBv].videoUpUid && videoInfoDict[videoBv].videoUpName) {
-        consoleLogOutput(videoBv, "getUpNameAndUpUid() 已成功在API上获取 Up主名称 Up主Uid 视频时长");
-        return;
-    } else {
-        consoleLogOutput(videoBv, "getUpNameAndUpUid() 暂时未获取 Up主Uid Up主名称 视频时长");
-        return;
-    }
+        .catch((error) => console.error(videoBv, "getVideoApiInfo() Fetch错误:", error));
 }
 
-// 判断处理匹配的屏蔽Up主名称或Up主Uid
-function handleBlockedUpNameOrUpUid(videoElement, videoBv, withinFetch = false) {
-    if (!videoInfoDict[videoBv].videoUpUid) {
-        consoleLogOutput(videoBv, "handleBlockedUpNameOrUpUid() 未获取到 UP主名称 UP主UID 信息，放弃执行");
-        return;
-    }
-
-    // 使用 屏蔽Up名称和Uid数组 与 视频UpUid 和 视频Up名称 进行匹配
-    const blockedNameOrUidFind = blockedParameter.blockedNameOrUidArray.find((blockedNameOrUid) => {
-        if (blockedNameOrUid == videoInfoDict[videoBv].videoUpUid) {
-            return videoInfoDict[videoBv].videoUpUid;
-        }
-        if (blockedNameOrUid == videoInfoDict[videoBv].videoUpName) {
-            return videoInfoDict[videoBv].videoUpName;
-        }
-    });
-    if (blockedNameOrUidFind) {
-        createOverlay(`屏蔽UP: ${blockedNameOrUidFind}`, videoElement, `${videoBv} handleBlockedUpNameOrUpUid()`);
-
-        if (withinFetch) {
-            consoleLogOutput(
-                videoBv,
-                "在 getUpNameAndUpUid() 的 Fetch 内执行 handleBlockedUpNameOrUpUid() 已屏蔽对应的 UP主名称 UP主UID"
-            );
-        } else {
-            consoleLogOutput(
-                videoBv,
-                "handleBlockedUpNameOrUpUid() 已屏蔽对应的 UP主名称 UP主UID ，跳过剩下主函数步骤"
-            );
-        }
-        return true;
-    }
-}
-
-// 获取视频元素的视频标签
-function getVideoTags(videoElement, videoBv) {
-    // 如果已经有 BV号 对应的 Up主名称 Up主Uid 视频时长 记录，跳过
+// API获取视频标签
+function getVideoApiTags(videoBv) {
+    // 如果已经有BV号对应的记录，跳过
     if (videoInfoDict[videoBv].videoTags) {
-        consoleLogOutput(videoBv, "getVideoTags() 在 videoInfoDict 中，已找到对应的 视频标签 记录");
         return;
     }
 
-    //获取当前时间
-    const currentTime = new Date();
-
-    // 当 lastTimeApiVideoTag 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
-    if (videoInfoDict[videoBv].lastTimeApiVideoTag && currentTime - videoInfoDict[videoBv].lastTimeApiVideoTag < 3000) {
-        consoleLogOutput(videoBv, "getVideoTags 距离上次 Fetch 获取视频标签还未超过3秒钟");
+    // 当 lastVideoTagApiRequestTime 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
+    const currentTime = new Date(); //获取当前时间
+    if (
+        videoInfoDict[videoBv].lastVideoTagApiRequestTime &&
+        currentTime - videoInfoDict[videoBv].lastVideoTagApiRequestTime < 3000
+    ) {
+        // consoleLogOutput(videoBv, "getVideoApiTags() 距离上次 Fetch 获取视频信息还未超过3秒钟");
         return;
     }
-
-    videoInfoDict[videoBv].lastTimeApiVideoTag = currentTime;
+    videoInfoDict[videoBv].lastVideoTagApiRequestTime = currentTime;
 
     // 获取视频标签
     fetch(`https://api.bilibili.com/x/web-interface/view/detail/tag?bvid=${videoBv}`)
         .then((response) => response.json())
-        .then((videoApiInfoJson) => {
-            let returnMessage = videoApiInfoJson.message;
-            consoleLogOutput(videoBv, "getVideoTags() Fetch:返回的消息: ", returnMessage);
+        .then((videoApiTagsJson) => {
+            // API获取标签对象，提取标签名字数组
+            videoInfoDict[videoBv].videoTags = videoApiTagsJson.data.map((tagsArray) => tagsArray.tag_name);
 
-            // 提取标签名字数组
-            videoInfoDict[videoBv].videoTags = videoApiInfoJson.data.map((tagInfoItem) => tagInfoItem.tag_name);
-            consoleLogOutput(videoBv, "getVideoTags() API获取的视频标签: ", videoInfoDict[videoBv].videoTags);
-
-            // 尝试在fetch异步结束后直接屏蔽处理 匹配的屏蔽视频标签
-            handleBlockedVideoTag(videoElement, videoBv, true);
+            FuckYouBilibiliRecommendationSystem();
         })
-        .catch((error) => console.error(videoBv, "getVideoTags() Fetch错误:", error));
+        .catch((error) => console.error(videoBv, "getVideoApiTags() Fetch错误:", error));
+}
 
-    // 如果已经有 BV号 对应的 Up主名称 Up主Uid 视频时长 记录，跳过
-    if (!videoInfoDict[videoBv].videoTags) {
-        consoleLogOutput(videoBv, "getVideoTags() 暂时未获取 视频标签 ，跳过剩下主函数步骤");
-        return true;
+// 处理匹配的屏蔽Up主名称或Up主Uid
+function handleBlockedNameOrUid(videoBv) {
+    // 判断是否拿到Up主名称或Up主Uid
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    // 记录触发的规则内容
+    let blockedRulesItemText = "";
+
+    // 是否启用正则
+    if (blockedParameter.blockedNameOrUid_UseRegular) {
+        // 使用 屏蔽Up名称和Uid数组 与 视频Up主Uid 和 视频Up主名称 进行匹配
+        const blockedNameOrUidHitItem = blockedParameter.blockedNameOrUid_Array.find((blockedNameOrUidItem) => {
+            // 正则化屏蔽Up主名称、视频Up主Uid
+            const blockedNameOrUidRegEx = new RegExp(blockedNameOrUidItem);
+
+            // 只有UP名称有正则的意义，Uid依然是直接对比
+            if (blockedNameOrUidRegEx.test(videoInfoDict[videoBv].videoUpName)) {
+                blockedRulesItemText = videoInfoDict[videoBv].videoUpName;
+                return true;
+            }
+
+            if (blockedNameOrUidItem == videoInfoDict[videoBv].videoUpUid) {
+                blockedRulesItemText = videoInfoDict[videoBv].videoUpUid;
+                return true;
+            }
+        });
+
+        if (blockedNameOrUidHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽UP", blockedRulesItemText);
+        }
+    } else {
+        // 使用 屏蔽Up名称和Uid数组 与 视频Up主Uid 和 视频Up主名称 进行匹配
+        const blockedNameOrUidHitItem = blockedParameter.blockedNameOrUid_Array.find((blockedNameOrUidItem) => {
+            if (blockedNameOrUidItem == videoInfoDict[videoBv].videoUpName) {
+                blockedRulesItemText = videoInfoDict[videoBv].videoUpName;
+                return true;
+            }
+
+            if (blockedNameOrUidItem == videoInfoDict[videoBv].videoUpUid) {
+                blockedRulesItemText = videoInfoDict[videoBv].videoUpUid;
+                return true;
+            }
+        });
+
+        if (blockedNameOrUidHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽UP", blockedRulesItemText);
+        }
     }
 }
 
-// 判断处理匹配的屏蔽视频标签
-function handleBlockedVideoTag(videoElement, videoBv, withinFetch = false) {
+// 处理匹配的屏蔽视频分区
+function handleBlockedVideoPartitions(videoBv) {
+    // 判断是否拿到视频分区
+    if (!videoInfoDict[videoBv].videoPartitions) {
+        return;
+    }
+
+    // 记录触发的规则内容
+    let blockedRulesItemText = "";
+
+    // 是否启用正则
+    if (blockedParameter.blockedVideoPartitions_UseRegular) {
+        // 使用 屏蔽视频分区数组 与 视频分区 进行匹配
+        const blockedVideoPartitionsHitItem = blockedParameter.blockedVideoPartitions_Array.find(
+            (blockedVideoPartitionsItem) => {
+                // 正则化屏蔽视频标签
+                const blockedVideoPartitionsRegEx = new RegExp(blockedVideoPartitionsItem);
+
+                if (blockedVideoPartitionsRegEx.test(videoInfoDict[videoBv].videoPartitions)) {
+                    blockedRulesItemText = videoInfoDict[videoBv].videoPartitions;
+                    return true;
+                }
+            }
+        );
+
+        if (blockedVideoPartitionsHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽分区", blockedRulesItemText);
+        }
+    } else {
+        // 使用 屏蔽视频分区数组 与 视频分区 进行匹配
+        const blockedVideoPartitionsHitItem = blockedParameter.blockedVideoPartitions_Array.find(
+            (blockedVideoPartitionsItem) => {
+                if (blockedVideoPartitionsItem == videoInfoDict[videoBv].videoPartitions) {
+                    blockedRulesItemText = videoInfoDict[videoBv].videoPartitions;
+                    return true;
+                }
+            }
+        );
+
+        if (blockedVideoPartitionsHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽分区", blockedRulesItemText);
+        }
+    }
+}
+
+// 处理匹配的屏蔽标签
+function handleBlockedTag(videoBv) {
+    // 判断是否拿到视频标签
     if (!videoInfoDict[videoBv].videoTags) {
-        consoleLogOutput(videoBv, "handleBlockedVideoTag() 未获取到 视频标签 信息，放弃执行");
         return;
     }
 
-    // 使用 屏蔽标签数组 与 视频标签 进行匹配
-    const blockedTagFind = blockedParameter.blockedTagArray.find((blockedTag) => {
-        const blockedTagRegEx = new RegExp(blockedTag);
-        return videoInfoDict[videoBv].videoTags.find((videoTag) => blockedTagRegEx.test(videoTag));
-    });
+    // 记录触发的规则内容
+    let blockedRulesItemText = "";
 
-    if (blockedTagFind) {
-        createOverlay(`屏蔽标签: ${blockedTagFind}`, videoElement, `${videoBv} handleBlockedVideoTag()`);
-        if (withinFetch) {
-            consoleLogOutput(videoBv, "在 getUpNameAndUpUid() 的 Fetch 内执行 handleBlockedVideoTag() 已屏蔽 屏蔽标签");
-        } else {
-            consoleLogOutput(videoBv, "handleBlockedVideoTag() 已屏蔽 屏蔽标签，跳过剩下主函数步骤");
-        }
-        return;
-    }
-
-    // 使用 双重屏蔽标签数组 与 视频标签 进行匹配
-    const doubleBlockedTagFind = blockedParameter.doubleBlockedTagArray.find((doubleBlockedTag) => {
-        // 以 "|" 分割成数组，同时都能匹配上才是符合
-        const doubleBlockedTagSplitArray = doubleBlockedTag.split("|");
-
-        const doubleBlockedTagRegEx0 = new RegExp(doubleBlockedTagSplitArray[0]);
-        const doubleBlockedTagRegEx1 = new RegExp(doubleBlockedTagSplitArray[1]);
-
-        if (
-            videoInfoDict[videoBv].videoTags.find((videoTag) => doubleBlockedTagRegEx0.test(videoTag)) &&
-            videoInfoDict[videoBv].videoTags.find((videoTag) => doubleBlockedTagRegEx1.test(videoTag))
-        ) {
-            return doubleBlockedTag;
-        }
-    });
-    if (doubleBlockedTagFind) {
-        createOverlay(`双重屏蔽标签: ${doubleBlockedTagFind}`, videoElement, `${videoBv} doubleBlockedTagFind()`);
-
-        if (withinFetch) {
-            consoleLogOutput(
-                videoBv,
-                "在 getUpNameAndUpUid() 的 Fetch 内执行 handleBlockedVideoTag() 已屏蔽 双重屏蔽标签"
+    // 是否启用正则
+    if (blockedParameter.blockedTag_UseRegular) {
+        // 使用 屏蔽标签数组 与 视频标题数组 进行匹配
+        const blockedTagHitItem = blockedParameter.blockedTag_Array.find((blockedTagItem) => {
+            // 正则化屏蔽视频标签
+            const blockedTagRegEx = new RegExp(blockedTagItem);
+            // 使用 屏蔽标签正则 和 视频标题数组 进行匹配
+            const videoTagHitItem = videoInfoDict[videoBv].videoTags.find((videoTagItem) =>
+                blockedTagRegEx.test(videoTagItem)
             );
-        } else {
-            consoleLogOutput(videoBv, "handleBlockedVideoTag() 已屏蔽 双重屏蔽标签，跳过剩下主函数步骤");
+
+            if (videoTagHitItem) {
+                blockedRulesItemText = videoTagHitItem;
+                return true;
+            }
+        });
+
+        if (blockedTagHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽标签", blockedRulesItemText);
         }
-        return;
+    } else {
+        // 使用 屏蔽标签数组 与 视频标题数组 进行匹配
+        const blockedTagHitItem = blockedParameter.blockedTag_Array.find((blockedTagItem) => {
+            // 使用 屏蔽标签 和 视频标题数组 进行匹配
+            const videoTagHitItem = videoInfoDict[videoBv].videoTags.find(
+                (videoTagItem) => blockedTagItem == videoTagItem
+            );
+
+            if (videoTagHitItem) {
+                blockedRulesItemText = videoTagHitItem;
+                return true;
+            }
+        });
+
+        if (blockedTagHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽标签", blockedRulesItemText);
+        }
     }
 }
 
-// 创建屏蔽叠加层（屏蔽操作）
-function createOverlay(text, videoElement, operationInfo, setTimeoutStatu = false) {
-    // 获取元素状态，确认是否为已经隐藏
-    if (videoElement.style.display == "none") {
-        consoleLogOutput(operationInfo, "隐藏视频元素 出现重复处理 跳过");
+// 处理匹配屏蔽双重屏蔽标签
+function handleDoubleBlockedTag(videoBv) {
+    // 判断是否拿到视频标签
+    if (!videoInfoDict[videoBv].videoTags) {
         return;
     }
 
-    // 获取子元素，确认是否为已经修改
-    if (videoElement.firstElementChild.className == "blockedOverlay") {
-        consoleLogOutput(operationInfo, "创建屏蔽叠加层 出现重复处理 跳过");
-        return;
-    }
+    // 记录触发的规则内容
+    let blockedRulesItemText = "";
 
+    // 是否启用正则
+    if (blockedParameter.doubleBlockedTag_UseRegular) {
+        // 使用 双重屏蔽标签数组 与 视频标签 进行匹配
+        const doubleBlockedTagHitItem = blockedParameter.doubleBlockedTag_Array.find((doubleBlockedTag) => {
+            // 以 "|" 分割成数组，同时都能匹配上才是符合
+            const doubleBlockedTagSplitArray = doubleBlockedTag.split("|");
+            const doubleBlockedTagRegEx0 = new RegExp(doubleBlockedTagSplitArray[0]);
+            const doubleBlockedTagRegEx1 = new RegExp(doubleBlockedTagSplitArray[1]);
 
-    // 如果启用了隐藏视频模式，直接隐藏元素，跳过剩下的操作
-    if (blockedParameter.hideVideoModeSwitch == true) {
-        // 判断当前页面URL是否以 https://search.bilibili.com/ 开头
-        if (window.location.href.startsWith("https://search.bilibili.com/")) {
-            videoElement.parentNode.style.display = "none";
-        } else {
-            videoElement.style.display = "none";
+            const videoTagHitItem0 = videoInfoDict[videoBv].videoTags.find((videoTagItem) =>
+                doubleBlockedTagRegEx0.test(videoTagItem)
+            );
+            const videoTagHitItem1 = videoInfoDict[videoBv].videoTags.find((videoTagItem) =>
+                doubleBlockedTagRegEx1.test(videoTagItem)
+            );
+
+            if (videoTagHitItem0 && videoTagHitItem1) {
+                blockedRulesItemText = `${videoTagHitItem0},${videoTagHitItem1}`;
+                return true;
+            }
+        });
+
+        if (doubleBlockedTagHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽双重标签", blockedRulesItemText);
         }
-        return;
+    } else {
+        // 使用 双重屏蔽标签数组 与 视频标签 进行匹配
+        const doubleBlockedTagHitItem = blockedParameter.doubleBlockedTag_Array.find((doubleBlockedTag) => {
+            // 以 "|" 分割成数组，同时都能匹配上才是符合
+            const doubleBlockedTagSplitArray = doubleBlockedTag.split("|");
+
+            const videoTagHitItem0 = videoInfoDict[videoBv].videoTags.find(
+                (videoTagItem) => doubleBlockedTagSplitArray[0] == videoTagItem
+            );
+            const videoTagHitItem1 = videoInfoDict[videoBv].videoTags.find(
+                (videoTagItem) => doubleBlockedTagSplitArray[1] == videoTagItem
+            );
+
+            if (videoTagHitItem0 && videoTagHitItem1) {
+                blockedRulesItemText = `${videoTagHitItem0},${videoTagHitItem1}`;
+                return true;
+            }
+        });
+
+        if (doubleBlockedTagHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽双重标签", blockedRulesItemText);
+        }
     }
-
-
-    // Bug记录：
-    // 位置: 视频播放页面 (即 https://www.bilibili.com/video/BVxxxxxx 页面下)
-    // 行为: 添加屏蔽叠加层 这个操作 只因为 屏蔽标签 的方式来触发时 (如果还触发了 屏蔽标题 屏蔽短时长 这一类，是不会出现这个Bug的。)
-    // 症状: 渲染异常，右侧视频推荐列表的封面图片不可见；评论区丢失；页面头部的搜索框丢失 (div.center-search__bar 丢失)；
-    // 处理: 延迟添加 overlay 可解决，先暂时把元素变成透明/模糊的，等3秒，页面完全加载完了，再创建创建屏蔽叠加层，再把元素改回正常。
-    // 猜测: 我一开始以为是使用 fetch 获取API造成的，因为只有 屏蔽标签 这个操作必须通过 fetch 获取标签信息的。
-    //      但是出现 屏蔽标题 屏蔽短时长 多种触发的情况下，又不会触发这个Bug了，想不懂，我也不会调试这种加载过程。
-
-    // 在 视频播放页面 "card-box" 创建屏蔽叠加层操作作延迟处理
-    if (videoElement.firstElementChild.className == "card-box" && setTimeoutStatu == false) {
-        // 元素先改模糊
-        // videoElement.style.opacity = "0";
-        videoElement.style.filter = "blur(5px)";
-        // 延迟3秒
-        setTimeout(() => {
-            // 创建屏蔽叠加层
-            createOverlay(text, videoElement, `${operationInfo} 延迟处理`, true);
-            //元素再改回正常
-            // videoElement.style.opacity = "1";
-            videoElement.style.filter = "none";
-        }, 3000);
-
-        return;
-    }
-
-    // 获取 videoElement 的尺寸
-    const elementRect = videoElement.getBoundingClientRect();
-
-    // 叠加层参数(背景)
-    let overlay = document.createElement("div");
-    overlay.className = "blockedOverlay";
-    overlay.style.position = "absolute";
-    overlay.style.width = elementRect.width + "px"; // 使用 videoElement 的宽度
-    overlay.style.height = elementRect.height + "px"; // 使用 videoElement 的高度
-    overlay.style.backgroundColor = blockedOverlayColor;
-    overlay.style.display = "flex";
-    overlay.style.justifyContent = "center";
-    overlay.style.alignItems = "center";
-    overlay.style.zIndex = "10";
-    overlay.style.backdropFilter = "blur(6px)";
-    overlay.style.borderRadius = "6px";
-
-    let overlayText = document.createElement("div");
-    if (videoElement.firstElementChild.className == "card-box") {
-        overlayText.style.fontSize = "1.25em";
-    }
-    overlayText.innerText = text;
-    overlayText.style.color = uiTextColor;
-    overlay.appendChild(overlayText);
-
-    // 添加叠加层为最前面的子元素
-    videoElement.insertAdjacentElement("afterbegin", overlay);
 }
 
-// -----------------主函数----------------------
+// 处理匹配短时长视频
+function handleBlockedShortDuration(videoBv) {
+    // 判断是否拿到视频时长
+    if (!videoInfoDict[videoBv].videoDuration) {
+        return;
+    }
+
+    // 判断设置的屏蔽短时长视频值 是否大于 视频时长
+    if (blockedParameter.blockedShortDuration > videoInfoDict[videoBv].videoDuration) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽短时长视频", videoInfoDict[videoBv].videoDuration + "秒");
+    }
+}
+
+// 处理 屏蔽低播放量视频
+function handleBlockedBelowVideoViews(videoBv) {
+    // 判断是否拿到视频播放量
+    if (!videoInfoDict[videoBv].videoView) {
+        return;
+    }
+
+    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
+    if (blockedParameter.blockedBelowVideoViews > videoInfoDict[videoBv].videoView) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低播放量", videoInfoDict[videoBv].videoView + "次");
+    }
+}
+
+// 处理匹配屏蔽低于指定点赞率的视频
+function handleBlockedBelowLikesRate(videoBv) {
+    // 判断是否拿到视频点赞数
+    if (!videoInfoDict[videoBv].videoLikesRate) {
+        return;
+    }
+
+    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
+    if (blockedParameter.blockedBelowLikesRate > videoInfoDict[videoBv].videoLikesRate) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低点赞率", videoInfoDict[videoBv].videoLikesRate + "%");
+    }
+}
+
+// 处理匹配屏蔽竖屏视频
+function handleBlockedPortraitVideo(videoBv) {
+    // 判断是否拿到视频分辨率
+    if (!videoInfoDict[videoBv].videoResolution.width) {
+        return;
+    }
+
+    // 横向分辨率小于纵向分辨率就是竖屏
+    if (videoInfoDict[videoBv].videoResolution.width < videoInfoDict[videoBv].videoResolution.height) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(
+            videoBv,
+            "屏蔽竖屏视频",
+            `${videoInfoDict[videoBv].videoResolution.width} x ${videoInfoDict[videoBv].videoResolution.height}`
+        );
+    }
+}
+
+// 处理匹配的白名单Up主和Uid
+function handleWhitelistNameOrUid(videoBv) {
+    // 判断是否拿到Up主名称或Up主Uid
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    // 使用 白名单Up主和Uid数组 与 视频Up主Uid 和 视频Up主名称 进行匹配
+    const videoNameOrUid = blockedParameter.whitelistNameOrUid_Array.find((whitelistNameOrUidItem) => {
+        if (whitelistNameOrUidItem == videoInfoDict[videoBv].videoUpName) {
+            return true;
+        }
+
+        if (whitelistNameOrUidItem == videoInfoDict[videoBv].videoUpUid) {
+            return true;
+        }
+    });
+
+    if (videoNameOrUid) {
+        // 标记为白名单目标
+        videoInfoDict[videoBv].whiteListTargets = true;
+    }
+}
+
+// 隐藏非视频元素
+function hideNonVideoElements() {
+    // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
+    const floor_single_card_Elements = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
+    floor_single_card_Elements.forEach(function (element) {
+        element.style.display = "none";
+    });
+
+    // 隐藏首页广告，那些没有“enable-no-interest” CSS类的视频卡片元素
+    const home_ad_Elements = document.querySelectorAll("div.bili-video-card.is-rcmd:not(.enable-no-interest)");
+    home_ad_Elements.forEach(function (element) {
+        // 检查其父元素是否是 .feed-card
+        if (element.closest("div.feed-card") !== null) {
+            // 如果是，选择其父元素并应用样式
+            element.closest("div.feed-card").style.display = "none";
+        } else {
+            // 如果不是，直接在视频元素上应用样式
+            element.style.display = "none";
+        }
+    });
+
+    // 隐藏视频播放页右侧广告
+    const ad_report_Elements = document.querySelectorAll("div#slide_ad, a.ad-report");
+    ad_report_Elements.forEach(function (element) {
+        element.style.display = "none";
+    });
+}
+
+// 屏蔽或者取消屏蔽
+function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
+    // 是白名单目标，是屏蔽目标，没有隐藏、没有叠加层：跳过
+    if (
+        videoInfoDict[videoBv].whiteListTargets &&
+        videoInfoDict[videoBv].blockedTarget &&
+        videoElement.style.display != "none" &&
+        videoElement.firstElementChild.className != "blockedOverlay"
+    ) {
+        return;
+    }
+
+    // 是白名单目标，是屏蔽目标, 有隐藏或有叠加层：去除隐藏或叠加层
+    if (
+        videoInfoDict[videoBv].whiteListTargets &&
+        videoInfoDict[videoBv].blockedTarget &&
+        (videoElement.style.display == "none" || videoElement.firstElementChild.className == "blockedOverlay")
+    ) {
+        // 去除叠加层
+        removeHiddenOrOverlay(videoElement, videoBv, setTimeoutStatu);
+        return;
+    }
+
+    // 不是白名单目标，是屏蔽目标, 有隐藏或有叠加层：跳过
+    if (
+        videoInfoDict[videoBv].whiteListTargets != true &&
+        videoInfoDict[videoBv].blockedTarget &&
+        (videoElement.style.display == "none" || videoElement.firstElementChild.className == "blockedOverlay")
+    ) {
+        return;
+    }
+
+    // 不是白名单目标，是屏蔽目标, 没有隐藏、没有叠加层：隐藏或添加叠加层
+    if (
+        videoInfoDict[videoBv].whiteListTargets != true &&
+        videoInfoDict[videoBv].blockedTarget &&
+        videoElement.style.display != "none" &&
+        videoElement.firstElementChild.className != "blockedOverlay"
+    ) {
+        // 隐藏或添加叠加层
+        addHiddenOrOverlay(videoElement, videoBv, setTimeoutStatu);
+        return;
+    }
+
+    // 隐藏或添加叠加层
+    function addHiddenOrOverlay(videoElement, videoBv, setTimeoutStatu) {
+        // 是否为隐藏视频模式？
+        if (blockedParameter.hideVideoMode_Switch == true) {
+            // 隐藏视频
+
+            // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面，修改父元素
+            if (window.location.href.startsWith("https://search.bilibili.com/")) {
+                videoElement.parentNode.style.display = "none";
+                // 为什么改了父元素，还要改元素本身？为了方便上面的判断。
+                videoElement.style.display = "none";
+            }
+            // 如果是父元素是feed-card，修改父元素
+            else if (videoElement.closest("div.feed-card") !== null) {
+                videoElement.closest("div.feed-card").style.display = "none";
+                videoElement.style.display = "none";
+            } else {
+                videoElement.style.display = "none";
+            }
+        } else {
+            // 添加叠加层
+
+            // Bug记录：
+            // 位置: 视频播放页面 (即 https://www.bilibili.com/video/BVxxxxxx 页面下)
+            // 行为: 添加屏蔽叠加层 这个操作 只因为 屏蔽标签 的方式来触发时 (如果还触发了 屏蔽标题 屏蔽短时长 这一类，是不会出现这个Bug的。)
+            // 症状: 渲染异常，右侧视频推荐列表的封面图片不可见；评论区丢失；页面头部的搜索框丢失 (div.center-search__bar 丢失)；
+            // 处理: 延迟添加 overlay 可解决，先暂时把元素变成透明/模糊的，等3秒，页面完全加载完了，再创建创建屏蔽叠加层，再把元素改回正常。
+            // 猜测: 我一开始以为是使用 fetch 获取API造成的，因为只有 屏蔽标签 这个操作必须通过 fetch 获取标签信息的。
+            //      但是出现 屏蔽标题 屏蔽短时长 多种触发的情况下，又不会触发这个Bug了，想不懂，我也不会调试这种加载过程。
+
+            // 在 视频播放页面 "card-box" 创建屏蔽叠加层操作作延迟处理
+            if (videoElement.firstElementChild.className == "card-box" && setTimeoutStatu == false) {
+                // 元素先改模糊
+                // videoElement.style.opacity = "0";
+                videoElement.style.filter = "blur(5px)";
+                // 延迟3秒
+                setTimeout(() => {
+                    // 创建屏蔽叠加层
+                    blockedOrUnblocked(videoElement, videoBv, true);
+                    // 元素再改回正常
+                    // videoElement.style.opacity = "1";
+                    videoElement.style.filter = "none";
+                }, 3000);
+
+                return;
+            }
+
+            // 获取 videoElement 的尺寸
+            const elementRect = videoElement.getBoundingClientRect();
+
+            // 叠加层参数(背景)
+            let overlay = document.createElement("div");
+            overlay.className = "blockedOverlay";
+            overlay.style.position = "absolute";
+            overlay.style.width = elementRect.width + "px"; // 使用 videoElement 的宽度
+            overlay.style.height = elementRect.height + "px"; // 使用 videoElement 的高度
+            overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
+            overlay.style.display = "flex";
+            overlay.style.justifyContent = "center";
+            overlay.style.alignItems = "center";
+            overlay.style.zIndex = "10";
+            overlay.style.backdropFilter = "blur(6px)";
+            overlay.style.borderRadius = "6px";
+
+            // 叠加层文本参数(背景)
+            let overlayText = document.createElement("div");
+            if (videoElement.firstElementChild.className == "card-box") {
+                overlayText.style.fontSize = "1.25em";
+            }
+            // 使用 videoInfoDict[videoBv] 里面的存储的触发规则的第1条来做为提示文字
+            overlayText.innerText = videoInfoDict[videoBv].triggeredBlockedRules[0];
+            overlayText.style.color = "rgb(250,250,250)";
+            overlay.appendChild(overlayText);
+
+            // 添加叠加层为最前面的子元素
+            videoElement.insertAdjacentElement("afterbegin", overlay);
+        }
+    }
+
+    // 去除隐藏或叠加层
+    function removeHiddenOrOverlay(videoElement) {
+        // 是否为隐藏视频模式？
+        if (blockedParameter.hideVideoMode_Switch == true) {
+            // 取消隐藏
+
+            // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面
+            if (window.location.href.startsWith("https://search.bilibili.com/")) {
+                videoElement.parentNode.style.display = "";
+                videoElement.style.display = "";
+            }
+            // 如果是父元素是feed-card
+            else if (videoElement.closest("div.feed-card") !== null) {
+                videoElement.closest("div.feed-card").style.display = "";
+                videoElement.style.display = "";
+            } else {
+                videoElement.style.display = "";
+            }
+        } else {
+            // 删除叠加层
+            if (videoElement.firstElementChild.className == "blockedOverlay") {
+                videoElement.removeChild(videoElement.firstElementChild);
+            }
+        }
+    }
+}
+
+// -----------------主流程函数----------------------
 
 // 屏蔽Bilibili上的符合屏蔽条件的视频
 function FuckYouBilibiliRecommendationSystem() {
-    // 获取所有包含B站视频相关标签的视频元素
-    const videoElementArray = getVideoElements();
+    // 是否启用 隐藏非视频元素
+    if (blockedParameter.hideNonVideoElements_Switch) {
+        // 隐藏非视频元素
+        hideNonVideoElements();
+    }
 
     // 输出整个视频信息字典
     consoleLogOutput(Object.keys(videoInfoDict).length, "个视频信息: ", videoInfoDict);
 
+    // 获取所有包含B站视频相关标签的视频元素
+    const videoElements = getVideoElements();
+
     // 遍历每个视频元素
-    for (let videoElement of videoElementArray) {
-        // 是否为已经屏蔽处理过的子元素
+    for (let videoElement of videoElements) {
+        // 判断是否为已经屏蔽处理过的子元素
         if (isAlreadyBlockedChildElement(videoElement)) {
             // 如果是已经屏蔽处理过的子元素，跳过后续操作
             continue;
         }
 
-        // 获取视频元素的Bv号和标题
+        // 网页获取视频元素的Bv号和标题
         let videoBv = getBvAndTitle(videoElement);
+
+        // 如果没有拿到Bv号，跳过后续操作
         if (!videoBv) {
-            // 如果没有拿到Bv号，跳过后续操作
             continue;
         }
 
-        // 判断处理匹配的屏蔽标题
-        if (handleBlockedTitle(videoElement, videoBv)) {
-            // 如果匹配成功并屏蔽，跳过后续操作
-            continue;
+        // 是否启用 屏蔽标题
+        if (blockedParameter.blockedTitle_Switch && blockedParameter.blockedTitle_Array.length > 0) {
+            // 判断处理匹配的屏蔽标题
+            handleBlockedTitle(videoBv);
         }
 
-        // 是否处理短时长视频
-        if (blockedParameter.blockedShortDuration > 0) {
-            // 获取视频元素的视频时长
-            getDuration(videoElement, videoBv);
+        // 网页获取视频Up名和UpUid
+        getNameAndUid(videoElement, videoBv);
 
-            // 判断处理匹配的短时长视频
-            if (handleBlockedShortDuration(videoElement, videoBv)) {
-                // 如果匹配成功并屏蔽，跳过后续操作
-                continue;
-            }
-        }
+        // 通过API获取视频信息
+        getVideoApiInfo(videoBv);
 
-        // 是否处理屏蔽Up主名称或Up主Uid
-        if (blockedParameter.blockedNameOrUidArray.length > 0) {
-            // 获取视频元素的Up主名称和Up主Uid
-            getUpNameAndUpUid(videoElement, videoBv);
-
+        // 是否启用 屏蔽Up主名称或Up主Uid
+        if (blockedParameter.blockedNameOrUid_Switch && blockedParameter.blockedNameOrUid_Array.length > 0) {
             // 判断处理匹配的屏蔽Up主名称或Up主Uid
-            if (handleBlockedUpNameOrUpUid(videoElement, videoBv)) {
-                // 如果匹配成功并屏蔽，跳过后续操作
-                continue;
-            }
+            handleBlockedNameOrUid(videoBv);
         }
 
-        // 是否处理屏蔽视频标签
-        if (blockedParameter.blockedTagArray.length > 0 || blockedParameter.doubleBlockedTagArray.length > 0) {
-            // 获取视频元素的视频标签
-            if (getVideoTags(videoElement, videoBv)) {
-                // 如果没有拿到视频元素的视频标签，跳过后续操作
-                continue;
-            }
-
-            // 判断处理匹配的屏蔽视频标签
-            if (handleBlockedVideoTag(videoElement, videoBv)) {
-                // 如果匹配成功并屏蔽，跳过后续操作
-                continue;
-            }
+        // 是否启用 屏蔽视频分区
+        if (
+            blockedParameter.blockedVideoPartitions_Switch &&
+            blockedParameter.blockedVideoPartitions_Array.length > 0
+        ) {
+            // 判断处理匹配 屏蔽视频分区
+            handleBlockedVideoPartitions(videoBv);
         }
+
+        // 是否启用 屏蔽短时长视频
+        if (blockedParameter.blockedShortDuration_Switch && blockedParameter.blockedShortDuration > 0) {
+            // 判断处理匹配的短时长视频
+            handleBlockedShortDuration(videoBv);
+        }
+
+        // 是否启用 屏蔽低播放量视频
+        if (blockedParameter.blockedBelowVideoViews_Switch && blockedParameter.blockedBelowVideoViews > 0) {
+            // 判断处理匹配的低播放量视频
+            handleBlockedBelowVideoViews(videoBv);
+        }
+
+        // 是否启用 屏蔽低于指定点赞率的视频
+        if (blockedParameter.blockedBelowLikesRate_Switch && blockedParameter.blockedBelowLikesRate > 0) {
+            // 判断处理 屏蔽低于指定点赞率的视频
+            handleBlockedBelowLikesRate(videoBv);
+        }
+
+        // 是否启用 屏蔽竖屏视频
+        if (blockedParameter.blockedPortraitVideo_Switch) {
+            // 判断处理 屏蔽竖屏视频
+            handleBlockedPortraitVideo(videoBv);
+        }
+
+        // 通过API获取视频标签
+        getVideoApiTags(videoBv);
+
+        // 是否启用 屏蔽标签
+        if (blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) {
+            // 判断处理 屏蔽标签
+            handleBlockedTag(videoBv);
+        }
+
+        // 是否启用 屏蔽双重屏蔽标签
+        if (blockedParameter.doubleBlockedTag_Switch && blockedParameter.doubleBlockedTag_Array.length > 0) {
+            // 判断处理 屏蔽双重屏蔽标签
+            handleDoubleBlockedTag(videoBv);
+        }
+
+        // 是否启用 白名单Up主和Uid
+        if (blockedParameter.whitelistNameOrUid_Switch && blockedParameter.whitelistNameOrUid_Array.length > 0) {
+            // 判断处理 白名单Up主和Uid
+            handleWhitelistNameOrUid(videoBv);
+        }
+
+        // 屏蔽或者取消屏蔽
+        blockedOrUnblocked(videoElement, videoBv);
     }
-
-    // 输出整个视频信息字典
-    consoleLogOutput(Object.keys(videoInfoDict).length, "个视频信息: ", videoInfoDict);
 }
 
 // 页面加载完成后运行脚本
 window.addEventListener("load", FuckYouBilibiliRecommendationSystem);
 
 // 定义 MutationObserver 的回调函数
-function mutationCallback(mutationsList, observer) {
+function mutationCallback() {
     // 在这里运行你的脚本
     FuckYouBilibiliRecommendationSystem();
 }
