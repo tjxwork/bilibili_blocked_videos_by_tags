@@ -1,14 +1,3 @@
-<!--
- * @Author: tjxgame@outlook.com
- * @Date: 2024-01-30 14:57:38
- * @LastEditors: tjxgame
- * @LastEditTime: 2024-06-22 05:47:41
- * @FilePath: \es6d:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
- * @Description: 给个三连吧
- *
- * Copyright (c) 2024 by tjxwork, All Rights Reserved.
--->
-
 # Bilibili Blocked Videos By Tags
 
 对 Bilibili.com 的视频卡片元素，以标签、标题、UP 主、时长、播放量、点赞率、竖屏来判断匹配，添加覆盖叠加层或隐藏视频。
@@ -17,6 +6,10 @@
 欢迎订阅支持！你的支持就是维护的动力！
 
 # 更新：
+
+-   v1.0.1 修正了 B 站旧版首页的顶部推荐条失效的 Bug；  
+    如果用旧版首页只是想要更多的顶部推荐的话，建议使用 [bilibili-app-recommend](https://greasyfork.org/zh-CN/scripts/443530-bilibili-app-recommend) 脚本来获取更多的推荐。  
+    如果觉得现在版本的 B 站首页的推荐卡片有广告的问题，可以通过本脚本的 “隐藏首页等页面的非视频元素” 功能来解决。
 
 -   v1.0.0 菜单 UI 使用 Vue3 重构，现在不用担心缩放问题挡住 UI 了，界面更加现代化；改进了判断逻辑，现在可以使用白名单来避免误杀关注的 UP 了；  
     新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP 主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定 UP。

@@ -1,7 +1,15 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.0.0
+// @version         1.0.1
+// @note            v1.0.1 修正了B站旧版首页的顶部推荐条失效的Bug；
+// @note                   如果用旧版首页只是想要更多的顶部推荐的话，建议使用 bilibili-app-recommend 来获取更多的推荐。
+// @note                   如果觉得现在的B站首页的推荐流卡片有广告的问题，可以通过本脚本的 “隐藏首页等页面的非视频元素” 功能来解决。
+// @note
+// @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
+// @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
+// @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
+// @note
 // @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
 // @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
 // @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
@@ -29,6 +37,8 @@
 // @grant           GM_getValue
 // @grant           GM_addStyle
 // @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
+// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
+// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
@@ -911,10 +921,13 @@ function getVideoElements() {
     // 过滤掉没有包含a标签的元素
     videoElements = Array.from(videoElements).filter((element) => element.querySelector("a"));
 
-    // 过滤掉 CSS类刚好为 'bili-video-card is-rcmd' 的元素，因为是广告。
-    videoElements = Array.from(videoElements).filter(
-        (element) => element.classList.value !== "bili-video-card is-rcmd"
-    );
+    // 判断是否存在旧版首页的顶部推荐条，为空的情况下再进行剔除广告元素，因为旧版首页的顶部推荐条，和新版的广告元素的类值一样……
+    if (document.querySelector("div.recommend-container__2-line") == null) {
+        // 过滤掉 CSS类刚好为 'bili-video-card is-rcmd' 的元素，因为是广告。
+        videoElements = Array.from(videoElements).filter(
+            (element) => element.classList.value !== "bili-video-card is-rcmd"
+        );
+    }
 
     // 返回处理后的结果
     return videoElements;
