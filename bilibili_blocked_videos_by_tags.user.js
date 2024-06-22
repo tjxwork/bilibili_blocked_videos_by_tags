@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.0.1
-// @note            v1.0.1 修正了B站旧版首页的顶部推荐条失效的Bug；
-// @note                   如果用旧版首页只是想要更多的顶部推荐的话，建议使用 bilibili-app-recommend 来获取更多的推荐。
-// @note                   如果觉得现在的B站首页的推荐流卡片有广告的问题，可以通过本脚本的 “隐藏首页等页面的非视频元素” 功能来解决。
+// @version         1.0.2
+// @note            v1.0.2 “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏视频播放页右侧最下方的“大家围观的直播”
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
+// @note            v1.0.1 修正了B站旧版首页的顶部推荐条失效的Bug；
+// @note                   如果用旧版首页只是想要更多的顶部推荐的话，建议使用 bilibili-app-recommend 来获取更多的推荐。
+// @note                   现在版本B站首页的推荐卡片有广告的问题，可以通过本脚本的 “隐藏首页等页面的非视频元素” 功能来解决。
 // @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
 // @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
 // @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
@@ -1509,8 +1510,8 @@ function hideNonVideoElements() {
         }
     });
 
-    // 隐藏视频播放页右侧广告
-    const ad_report_Elements = document.querySelectorAll("div#slide_ad, a.ad-report");
+    // 隐藏视频播放页右侧广告、大家围观的直播
+    const ad_report_Elements = document.querySelectorAll("div#slide_ad, a.ad-report, div.pop-live-small-mode");
     ad_report_Elements.forEach(function (element) {
         element.style.display = "none";
     });
