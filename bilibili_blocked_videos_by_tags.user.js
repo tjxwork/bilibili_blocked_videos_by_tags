@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.0
+// @version         1.1.1
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
-// @note            v1.1.0 添加新功能：“屏蔽开了精选评论的视频”，骗子视频大概率会开启精选评论；“隐藏非视频元素”功能，添加隐藏：视频相关的游戏推荐。
+// @note            v1.1.1 添加新功能：“屏蔽充电专属的视频”；
+// @note            v1.1.0 添加新功能：“屏蔽精选评论的视频”，骗子视频大概率会开启精选评论；“隐藏非视频元素”功能，添加隐藏：视频相关的游戏推荐。
 // @note            v1.0.2 “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏视频播放页右侧最下方的“大家围观的直播”
 // @note            v1.0.1 修正了B站旧版首页的顶部推荐条失效的Bug；
 // @note                   如果用旧版首页只是想要更多的顶部推荐的话，建议使用 bilibili-app-recommend 来获取更多的推荐。
@@ -88,6 +89,9 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
 
     // 屏蔽竖屏视频
     blockedPortraitVideo_Switch: false,
+
+    // 屏蔽充电专属的视频
+    blockedChargingExclusive_Switch: false,
 
     // 屏蔽精选评论的视频
     blockedFilteredCommentsVideo_Switch: false,
@@ -604,7 +608,11 @@ let menuUiHTML = `
     </div>
 
     <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽开了精选评论的视频</label>
+        <label><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频</label>
+    </div>
+
+    <div class="menuOptions">
+        <label><input type="checkbox" v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频</label>
     </div>
 
     <div class="menuOptions">
@@ -1178,6 +1186,9 @@ function getVideoApiInfo(videoBv) {
             // // API获取的视频弹幕数
             // videoInfoDict[videoBv].videoDanmaku = videoApiInfoJson.data.stat.danmaku;
 
+            // API获取的视频是否为充电专属
+            videoInfoDict[videoBv].videoChargingExclusive = videoApiInfoJson.data.is_upower_exclusive;
+
             // API获取的视频分辨率
             if (!videoInfoDict[videoBv].videoResolution) {
                 videoInfoDict[videoBv].videoResolution = {};
@@ -1311,7 +1322,7 @@ function handleBlockedFilteredCommentsVideo(videoBv) {
     // 判断设置的屏蔽精选评论的视频是否有启用标记
     if (videoInfoDict[videoBv].filteredComments) {
         // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽精选评论的视频", "是");
+        markAsBlockedTarget(videoBv, "屏蔽精选评论的视频", videoInfoDict[videoBv].videoUpName);
     }
 }
 
@@ -1587,6 +1598,15 @@ function handleBlockedPortraitVideo(videoBv) {
             "屏蔽竖屏视频",
             `${videoInfoDict[videoBv].videoResolution.width} x ${videoInfoDict[videoBv].videoResolution.height}`
         );
+    }
+}
+
+// 处理匹配 屏蔽充电专属视频
+function handleBlockedChargingExclusive(videoBv) {
+    // 判断设置的屏蔽充电专属视频是否有启用标记
+    if (videoInfoDict[videoBv].videoChargingExclusive) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽充电专属的视频", videoInfoDict[videoBv].videoUpName);
     }
 }
 
@@ -1881,6 +1901,12 @@ function FuckYouBilibiliRecommendationSystem() {
         if (blockedParameter.blockedPortraitVideo_Switch) {
             // 判断处理 屏蔽竖屏视频
             handleBlockedPortraitVideo(videoBv);
+        }
+
+        // 是否启用 屏蔽充电专属视频
+        if (blockedParameter.blockedChargingExclusive_Switch) {
+            // 判断处理 蔽充电专属视频
+            handleBlockedChargingExclusive(videoBv);
         }
 
         // 通过API获取视频标签
