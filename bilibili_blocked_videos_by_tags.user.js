@@ -1,14 +1,19 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.1
+// @version         1.1.2
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
+// @note            v1.1.2 添加新功能：“按置顶评论屏蔽”；
+// @note                   注意：“按置顶评论屏蔽”、“屏蔽精选评论的视频” 这两个功能都用到了获取评论的API，
+// @note                   这个API对请求频率非常敏感，频繁刷新或者开启新页面会导致B站拒绝请求，正常浏览一般不会出现拒绝问题。
 // @note            v1.1.1 添加新功能：“屏蔽充电专属的视频”；
-// @note            v1.1.0 添加新功能：“屏蔽精选评论的视频”，骗子视频大概率会开启精选评论；“隐藏非视频元素”功能，添加隐藏：视频相关的游戏推荐。
+// @note            v1.1.0 添加新功能：“屏蔽精选评论的视频”，骗子视频大概率会开启精选评论；
+// @note                   “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏视频播放页右侧视频相关的游戏推荐；
+// @note                   控制台输出日志优化：现在只有发生变化的时候才会输出；
 // @note            v1.0.2 “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏视频播放页右侧最下方的“大家围观的直播”
 // @note            v1.0.1 修正了B站旧版首页的顶部推荐条失效的Bug；
 // @note                   如果用旧版首页只是想要更多的顶部推荐的话，建议使用 bilibili-app-recommend 来获取更多的推荐。
@@ -95,6 +100,11 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
 
     // 屏蔽精选评论的视频
     blockedFilteredCommentsVideo_Switch: false,
+
+    // 屏蔽置顶评论
+    blockedTopComment_Switch: false,
+    blockedTopComment_UseRegular: true,
+    blockedTopComment_Array: [],
 
     // 白名单Up主和Uid
     whitelistNameOrUid_Switch: false,
@@ -557,6 +567,27 @@ let menuUiHTML = `
         </ul>
     </div>
 
+
+    <div class="menuOptions">
+        <div class="titleLabelLeft">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽 </label>
+        </div>
+
+        <div class="titleLabelRight">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_UseRegular" />启用正则</label>
+        </div>
+
+        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+            v-model="tempInputValue.blockedTopComment_Array" /><button
+            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTopComment_Array')">添加</button>
+
+        <ul>
+            <li v-for="(value, index) in menuUiSettings.blockedTopComment_Array">
+                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTopComment_Array)">×</button>
+            </li>
+        </ul>
+    </div>
+
     <div class="menuOptions">
         <div class="titleLabelLeft">
             <label><input type="checkbox"
@@ -675,6 +706,7 @@ function blockedMenuUi() {
                 blockedVideoPartitions_Array: "",
                 blockedTag_Array: "",
                 doubleBlockedTag_Array: "",
+                blockedTopComment_Array: "",
                 whitelistNameOrUid_Array: "",
                 // 临时提示文本
                 promptText_Switch: true,
@@ -695,6 +727,10 @@ function blockedMenuUi() {
 
             // 添加数组项目
             const addArrayButton = (tempInputValue, menuUiSettings, keyName) => {
+                // 确保 menuUiSettings[keyName] 是一个数组
+                if (!Array.isArray(menuUiSettings[keyName])) {
+                    menuUiSettings[keyName] = [];
+                }
                 // 双重标签的特殊处理 判断是否为空
                 if (keyName == "doubleBlockedTag_Array" && tempInputValue[keyName].trim()) {
                     // 使用 split 按逗号分隔，然后映射去除每个标签的首尾空白
@@ -846,21 +882,9 @@ let lastConsoleVideoInfoDict = {};
 //     BV12i4y1e73B: {
 //         videoLink: "https://www.bilibili.com/video/BV12i4y1e73B/",
 //         videoTitle: "B站按 标签 标题 时长 UP主来屏蔽视频 油猴插件【tjxgame】",
-//         videoUpUid: 351422438,
 //         videoUpName: "tjxgame",
-//         lastVideoInfoApiRequestTime: "2024-06-21T09:17:10.389Z",
-//         lastVideoTagApiRequestTime: "2024-06-21T09:17:10.389Z",
-//         lastVideoCommentsApiRequestTime: "2024-06-21T09:17:10.389Z",
-//         videoAVid: 536891764,
-//         videoDuration: 259,
+//         videoUpUid: 351422438,
 //         videoPartitions: "软件应用",
-//         videoView: 9067,
-//         videoLike: 507,
-//         videoLikesRate: "5.59",
-//         videoResolution: {
-//             width: 3840,
-//             height: 2160,
-//         },
 //         videoTags: [
 //             "科技2023年终总结",
 //             "视频",
@@ -874,6 +898,18 @@ let lastConsoleVideoInfoDict = {};
 //             "tjxgame",
 //             "2023热门年度盘点",
 //         ],
+//         topComment : "大更新，新视频！\nhttps://www.bilibili.com/video/BV1WJ4m1u79n/\n\nv1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；\n改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；\n新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。"
+//         whiteListTargets: true,
+//         videoDuration: 259,
+//         videoView: 9067,
+//         videoLike: 507,
+//         videoLikesRate: "5.59",
+//         videoResolution: {
+//             width: 3840,
+//             height: 2160,
+//         },
+//         videoChargingExclusive : false
+//         filteredComments: false,
 //         blockedTarget: true,
 //         triggeredBlockedRules: [
 //             "屏蔽短时长视频: 259秒",
@@ -885,8 +921,9 @@ let lastConsoleVideoInfoDict = {};
 //             "屏蔽标签: 标签",
 //             "屏蔽双重标签: 油猴,插件",
 //         ],
-//         filteredComments: false,
-//         whiteListTargets: true,
+//         lastVideoInfoApiRequestTime: "2024-06-21T09:17:10.389Z",
+//         lastVideoTagApiRequestTime: "2024-06-21T09:17:10.389Z",
+//         lastVideoCommentsApiRequestTime: "2024-06-21T09:17:10.389Z",
 //     },
 // };
 
@@ -1201,128 +1238,72 @@ function getVideoApiInfo(videoBv) {
         .catch((error) => console.error(videoBv, "getVideoApiInfo() Fetch错误:", error));
 }
 
-// API获取视频标签
-function getVideoApiTags(videoBv) {
-    // 如果已经有BV号对应的记录，跳过
-    if (videoInfoDict[videoBv].videoTags) {
+// 处理匹配短时长视频
+function handleBlockedShortDuration(videoBv) {
+    // 判断是否拿到视频时长
+    if (!videoInfoDict[videoBv].videoDuration) {
         return;
     }
 
-    // 当 lastVideoTagApiRequestTime 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
-    const currentTime = new Date(); //获取当前时间
-    if (
-        videoInfoDict[videoBv].lastVideoTagApiRequestTime &&
-        currentTime - videoInfoDict[videoBv].lastVideoTagApiRequestTime < 3000
-    ) {
-        // consoleLogOutput(videoBv, "getVideoApiTags() 距离上次 Fetch 获取视频信息还未超过3秒钟");
-        return;
-    }
-    videoInfoDict[videoBv].lastVideoTagApiRequestTime = currentTime;
-
-    // 获取视频标签
-    fetch(`https://api.bilibili.com/x/web-interface/view/detail/tag?bvid=${videoBv}`)
-        .then((response) => response.json())
-        .then((videoApiTagsJson) => {
-            // API获取标签对象，提取标签名字数组
-            videoInfoDict[videoBv].videoTags = videoApiTagsJson.data.map((tagsArray) => tagsArray.tag_name);
-
-            FuckYouBilibiliRecommendationSystem();
-        })
-        .catch((error) => console.error(videoBv, "getVideoApiTags() Fetch错误:", error));
-}
-
-// API获取视频评论区
-let apiRequestDelayTime = 0;
-function getVideoApiComments(videoBv) {
-    // 如果已经有BV号对应的记录，跳过
-    if (videoInfoDict[videoBv].filteredComments === false || videoInfoDict[videoBv].filteredComments === true) {
-        return;
-    }
-
-    // 当 lastVideoCommentsApiRequestTime 上次API获取视频评论区的时间存在，并且，和当前的时间差小于3秒时，跳过
-    const currentTime = new Date(); //获取当前时间
-    if (
-        videoInfoDict[videoBv].lastVideoCommentsApiRequestTime &&
-        currentTime - videoInfoDict[videoBv].lastVideoCommentsApiRequestTime < 3000
-    ) {
-        // consoleLogOutput(videoBv, "getVideoApiComments() 距离上次 Fetch 获取视频信息还未超过3秒钟");
-        return;
-    }
-    // 获取评论区的API貌似对频繁请求的容忍度很低，只能错开来请求，apiRequestDelayTime 延迟。
-    // 所以设置了每次调用 getVideoApiComments() 都会增加延迟，例如：每次加 50ms 再请求下一个请求。
-    // lastVideoCommentsApiRequestTime（上次API获取视频评论区的时间） 本质是为了限制每个BV号3秒只能请求一次，
-    // 但是加了延迟之后，到后面 apiRequestDelayTime 延迟本身就会超过3秒了。
-    // 还是会出现多次请求的问题，可能影响不大，但是还是把延迟值加进了 lastVideoCommentsApiRequestTime 里面。
-    // 这也相当于把 lastVideoCommentsApiRequestTime 修正为了正确请求时间。
-    let apiRequestDelayTimeData = new Date(apiRequestDelayTime);
-    videoInfoDict[videoBv].lastVideoCommentsApiRequestTime = new Date(
-        currentTime.getTime() + apiRequestDelayTimeData.getTime()
-    );
-
-    // apiRequestDelayTime 的最大值限制问题
-    // 如果不做限制的话，这个值可能会无限增大，导致最后加载的视频元素的请求也永远等不到生效时间。
-    // 以 videoInfoDict 对象的长度来做最大值限制貌似会比较合理一点。但是这个对象也可能会无限增大从而导致后面的请求等太久。
-    // 如果把 videoInfoDict[videoBv].filteredComments 筛选为 null 后的统计数值x延迟时间，做为最大延迟时间比较好？
-    // lastVideoCommentsApiRequestTime 也保证了每个Bv号的对应请求3秒只出现一次，这样就不用担心重复请求的问题。
-    // 但是本质上这一堆处理只是为了：防止频繁请求 https://api.bilibili.com/x/v2/reply 出现拒绝，同时为了效率的问题，每个Bv号只应该请求一次。
-
-    // 统计 videoInfoDict 中，视频Bv下面的 filteredComments 不存在的数量。
-    function filteredCommentsCount() {
-        let nullCount = 0;
-        for (const video in videoInfoDict) {
-            if (videoInfoDict[video].hasOwnProperty("filteredComments") == false) {
-                nullCount++;
-            }
-        }
-        return nullCount;
-    }
-
-    // 最大的延迟时间上限
-    let apiRequestDelayTimeMax = filteredCommentsCount() * 100;
-    // consoleLogOutput("最大的延迟时间上限", apiRequestDelayTimeMax);
-
-    // 每次调用增加的延迟 > 最大的延迟时间上限后 重置为0
-    if (apiRequestDelayTime > apiRequestDelayTimeMax) {
-        apiRequestDelayTime = 0;
-    }
-
-    setTimeout(() => {
-        // 设置请求的 URL 和参数
-        const url = "https://api.bilibili.com/x/v2/reply";
-        const params = {
-            type: 1, // 评论区类型代码
-            oid: videoBv, // 目标评论区 id
-            sort: 0, // 排序方式，默认为0，0：按时间，1：按点赞数，2：按回复数
-            ps: 1, // 每页项数，默认为20，定义域：1-20
-            pn: 1, // 页码，默认为1
-            nohot: 0, // 是否不显示热评，默认为0，1：不显示，0：显示
-        };
-        // 将参数转换为 URL 搜索字符串
-        const searchParams = new URLSearchParams(params).toString();
-
-        // 获取视频评论区
-        fetch(`${url}?${searchParams}`)
-            .then((response) => response.json())
-            .then((VideoApiCommentsJson) => {
-                // API获取精选评论标记
-                videoInfoDict[videoBv].filteredComments = VideoApiCommentsJson.data.control.web_selection;
-
-                FuckYouBilibiliRecommendationSystem();
-            })
-            .catch((error) => console.error(videoBv, "getVideoApiComments() Fetch错误:", error));
-    }, apiRequestDelayTime);
-
-    // 每次调用增加的延迟
-    // consoleLogOutput("本次调用增加延迟", apiRequestDelayTime);
-    apiRequestDelayTime = apiRequestDelayTime + 100;
-}
-
-// 处理匹配 屏蔽精选评论的视频
-function handleBlockedFilteredCommentsVideo(videoBv) {
-    // 判断设置的屏蔽精选评论的视频是否有启用标记
-    if (videoInfoDict[videoBv].filteredComments) {
+    // 判断设置的屏蔽短时长视频值 是否大于 视频时长
+    if (blockedParameter.blockedShortDuration > videoInfoDict[videoBv].videoDuration) {
         // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽精选评论的视频", videoInfoDict[videoBv].videoUpName);
+        markAsBlockedTarget(videoBv, "屏蔽短时长视频", videoInfoDict[videoBv].videoDuration + "秒");
+    }
+}
+
+// 处理 屏蔽低播放量视频
+function handleBlockedBelowVideoViews(videoBv) {
+    // 判断是否拿到视频播放量
+    if (!videoInfoDict[videoBv].videoView) {
+        return;
+    }
+
+    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
+    if (blockedParameter.blockedBelowVideoViews > videoInfoDict[videoBv].videoView) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低播放量", videoInfoDict[videoBv].videoView + "次");
+    }
+}
+
+// 处理匹配屏蔽低于指定点赞率的视频
+function handleBlockedBelowLikesRate(videoBv) {
+    // 判断是否拿到视频点赞数
+    if (!videoInfoDict[videoBv].videoLikesRate) {
+        return;
+    }
+
+    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
+    if (blockedParameter.blockedBelowLikesRate > videoInfoDict[videoBv].videoLikesRate) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低点赞率", videoInfoDict[videoBv].videoLikesRate + "%");
+    }
+}
+
+// 处理匹配屏蔽竖屏视频
+function handleBlockedPortraitVideo(videoBv) {
+    // 判断是否拿到视频分辨率
+    if (!videoInfoDict[videoBv].videoResolution.width) {
+        return;
+    }
+
+    // 横向分辨率小于纵向分辨率就是竖屏
+    if (videoInfoDict[videoBv].videoResolution.width < videoInfoDict[videoBv].videoResolution.height) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(
+            videoBv,
+            "屏蔽竖屏视频",
+            `${videoInfoDict[videoBv].videoResolution.width} x ${videoInfoDict[videoBv].videoResolution.height}`
+        );
+    }
+}
+
+// 处理匹配 屏蔽充电专属视频
+function handleBlockedChargingExclusive(videoBv) {
+    // 判断设置的屏蔽充电专属视频是否有启用标记
+    if (videoInfoDict[videoBv].videoChargingExclusive) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽充电专属的视频", videoInfoDict[videoBv].videoUpName);
     }
 }
 
@@ -1425,6 +1406,36 @@ function handleBlockedVideoPartitions(videoBv) {
             markAsBlockedTarget(videoBv, "屏蔽分区", blockedRulesItemText);
         }
     }
+}
+
+// API获取视频标签
+function getVideoApiTags(videoBv) {
+    // 如果已经有BV号对应的记录，跳过
+    if (videoInfoDict[videoBv].videoTags) {
+        return;
+    }
+
+    // 当 lastVideoTagApiRequestTime 上次API获取视频标签的时间存在，并且，和当前的时间差小于3秒时，跳过
+    const currentTime = new Date(); //获取当前时间
+    if (
+        videoInfoDict[videoBv].lastVideoTagApiRequestTime &&
+        currentTime - videoInfoDict[videoBv].lastVideoTagApiRequestTime < 3000
+    ) {
+        // consoleLogOutput(videoBv, "getVideoApiTags() 距离上次 Fetch 获取视频信息还未超过3秒钟");
+        return;
+    }
+    videoInfoDict[videoBv].lastVideoTagApiRequestTime = currentTime;
+
+    // 获取视频标签
+    fetch(`https://api.bilibili.com/x/web-interface/view/detail/tag?bvid=${videoBv}`)
+        .then((response) => response.json())
+        .then((videoApiTagsJson) => {
+            // API获取标签对象，提取标签名字数组
+            videoInfoDict[videoBv].videoTags = videoApiTagsJson.data.map((tagsArray) => tagsArray.tag_name);
+
+            FuckYouBilibiliRecommendationSystem();
+        })
+        .catch((error) => console.error(videoBv, "getVideoApiTags() Fetch错误:", error));
 }
 
 // 处理匹配的屏蔽标签
@@ -1541,72 +1552,143 @@ function handleDoubleBlockedTag(videoBv) {
     }
 }
 
-// 处理匹配短时长视频
-function handleBlockedShortDuration(videoBv) {
-    // 判断是否拿到视频时长
-    if (!videoInfoDict[videoBv].videoDuration) {
+// API获取视频评论区
+let apiRequestDelayTime = 0;
+function getVideoApiComments(videoBv) {
+    // 如果已经有BV号对应的记录，跳过
+    if (videoInfoDict[videoBv].filteredComments === false || videoInfoDict[videoBv].filteredComments === true) {
         return;
     }
 
-    // 判断设置的屏蔽短时长视频值 是否大于 视频时长
-    if (blockedParameter.blockedShortDuration > videoInfoDict[videoBv].videoDuration) {
+    // 当 lastVideoCommentsApiRequestTime 上次API获取视频评论区的时间存在，并且，和当前的时间差小于3秒时，跳过
+    const currentTime = new Date(); //获取当前时间
+    if (
+        videoInfoDict[videoBv].lastVideoCommentsApiRequestTime &&
+        currentTime - videoInfoDict[videoBv].lastVideoCommentsApiRequestTime < 3000
+    ) {
+        // consoleLogOutput(videoBv, "getVideoApiComments() 距离上次 Fetch 获取视频信息还未超过3秒钟");
+        return;
+    }
+    // 获取评论区的API貌似对频繁请求的容忍度很低，只能错开来请求，apiRequestDelayTime 延迟。
+    // 所以设置了每次调用 getVideoApiComments() 都会增加延迟，例如：每次加 50ms 再请求下一个请求。
+    // lastVideoCommentsApiRequestTime（上次API获取视频评论区的时间） 本质是为了限制每个BV号3秒只能请求一次，
+    // 但是加了延迟之后，到后面 apiRequestDelayTime 延迟本身就会超过3秒了。
+    // 还是会出现多次请求的问题，可能影响不大，但是还是把延迟值加进了 lastVideoCommentsApiRequestTime 里面。
+    // 这也相当于把 lastVideoCommentsApiRequestTime 修正为了正确请求时间。
+    let apiRequestDelayTimeData = new Date(apiRequestDelayTime);
+    videoInfoDict[videoBv].lastVideoCommentsApiRequestTime = new Date(
+        currentTime.getTime() + apiRequestDelayTimeData.getTime()
+    );
+
+    // apiRequestDelayTime 的最大值限制问题
+    // 如果不做限制的话，这个值可能会无限增大，导致最后加载的视频元素的请求也永远等不到生效时间。
+    // 以 videoInfoDict 对象的长度来做最大值限制貌似会比较合理一点。但是这个对象也可能会无限增大从而导致后面的请求等太久。
+    // 如果把 videoInfoDict[videoBv].filteredComments 筛选为 null 后的统计数值x延迟时间，做为最大延迟时间比较好？
+    // lastVideoCommentsApiRequestTime 也保证了每个Bv号的对应请求3秒只出现一次，这样就不用担心重复请求的问题。
+    // 但是本质上这一堆处理只是为了：防止频繁请求 https://api.bilibili.com/x/v2/reply 出现拒绝，同时为了效率的问题，每个Bv号只应该请求一次。
+
+    // 统计 videoInfoDict 中，视频Bv下面的 filteredComments 不存在的数量。
+    function filteredCommentsCount() {
+        let nullCount = 0;
+        for (const video in videoInfoDict) {
+            if (videoInfoDict[video].hasOwnProperty("filteredComments") == false) {
+                nullCount++;
+            }
+        }
+        return nullCount;
+    }
+
+    // 最大的延迟时间上限
+    let apiRequestDelayTimeMax = filteredCommentsCount() * 100;
+    // consoleLogOutput("最大的延迟时间上限", apiRequestDelayTimeMax);
+
+    // 每次调用增加的延迟 > 最大的延迟时间上限后 重置为0
+    if (apiRequestDelayTime > apiRequestDelayTimeMax) {
+        apiRequestDelayTime = 0;
+    }
+
+    setTimeout(() => {
+        // 设置请求的 URL 和参数
+        const url = "https://api.bilibili.com/x/v2/reply";
+        const params = {
+            type: 1, // 评论区类型代码
+            oid: videoBv, // 目标评论区 id
+            sort: 0, // 排序方式，默认为0，0：按时间，1：按点赞数，2：按回复数
+            ps: 1, // 每页项数，默认为20，定义域：1-20
+            pn: 1, // 页码，默认为1
+            nohot: 0, // 是否不显示热评，默认为0，1：不显示，0：显示
+        };
+        // 将参数转换为 URL 搜索字符串
+        const searchParams = new URLSearchParams(params).toString();
+
+        // 获取视频评论区
+        fetch(`${url}?${searchParams}`)
+            .then((response) => response.json())
+            .then((VideoApiCommentsJson) => {
+                // API获取精选评论标记
+                videoInfoDict[videoBv].filteredComments = VideoApiCommentsJson.data?.control?.web_selection;
+
+                // API获取置顶评论内容
+                videoInfoDict[videoBv].topComment = VideoApiCommentsJson.data.upper.top?.content?.message;
+
+                FuckYouBilibiliRecommendationSystem();
+            })
+            .catch((error) => console.error(videoBv, "getVideoApiComments() Fetch错误:", error));
+    }, apiRequestDelayTime);
+
+    // 每次调用增加的延迟
+    // consoleLogOutput("本次调用增加延迟", apiRequestDelayTime);
+    apiRequestDelayTime = apiRequestDelayTime + 100;
+}
+
+// 处理匹配 屏蔽精选评论的视频
+function handleBlockedFilteredCommentsVideo(videoBv) {
+    // 判断设置的屏蔽精选评论的视频是否有启用标记
+    if (videoInfoDict[videoBv].filteredComments) {
         // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽短时长视频", videoInfoDict[videoBv].videoDuration + "秒");
+        markAsBlockedTarget(videoBv, "屏蔽精选评论的视频", videoInfoDict[videoBv].videoUpName);
     }
 }
 
-// 处理 屏蔽低播放量视频
-function handleBlockedBelowVideoViews(videoBv) {
-    // 判断是否拿到视频播放量
-    if (!videoInfoDict[videoBv].videoView) {
+// 处理匹配 屏蔽置顶评论内容
+function handleBlockedTopComment(videoBv) {
+    // 判断是否拿到视频置顶评论
+    if (!videoInfoDict[videoBv].topComment) {
         return;
     }
 
-    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
-    if (blockedParameter.blockedBelowVideoViews > videoInfoDict[videoBv].videoView) {
-        // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽低播放量", videoInfoDict[videoBv].videoView + "次");
-    }
-}
+    // 记录触发的规则内容
+    // let blockedRulesItemText = "";
 
-// 处理匹配屏蔽低于指定点赞率的视频
-function handleBlockedBelowLikesRate(videoBv) {
-    // 判断是否拿到视频点赞数
-    if (!videoInfoDict[videoBv].videoLikesRate) {
-        return;
-    }
+    // 是否启用正则
+    if (blockedParameter.blockedTopComment_UseRegular) {
+        // 使用 屏蔽置顶评论数组 与 置顶评论 进行匹配
+        const blockedTopCommentHitItem = blockedParameter.blockedTopComment_Array.find((blockedTopComment) => {
+            // 正则化屏蔽置顶评论
+            const blockedTitleRegEx = new RegExp(blockedTopComment);
+            // 判断 正则化的屏蔽置顶评论 是否匹配 置顶评论
+            if (blockedTitleRegEx.test(videoInfoDict[videoBv].topComment)) {
+                return true;
+            }
+        });
 
-    // 判断设置的屏蔽视频点赞率值 是否大于 视频的点赞率
-    if (blockedParameter.blockedBelowLikesRate > videoInfoDict[videoBv].videoLikesRate) {
-        // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽低点赞率", videoInfoDict[videoBv].videoLikesRate + "%");
-    }
-}
+        if (blockedTopCommentHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽置顶评论", blockedTopCommentHitItem);
+        }
+    } else {
+        // 使用 屏蔽置顶评论数组 与 置顶评论 进行匹配
+        const blockedTopCommentHitItem = blockedParameter.blockedTopComment_Array.find((blockedTopComment) => {
+            // 判断 屏蔽置顶评论 是否匹配 置顶评论
+            if (blockedTopComment === videoInfoDict[videoBv].topComment) {
+                return true;
+            }
+        });
 
-// 处理匹配屏蔽竖屏视频
-function handleBlockedPortraitVideo(videoBv) {
-    // 判断是否拿到视频分辨率
-    if (!videoInfoDict[videoBv].videoResolution.width) {
-        return;
-    }
-
-    // 横向分辨率小于纵向分辨率就是竖屏
-    if (videoInfoDict[videoBv].videoResolution.width < videoInfoDict[videoBv].videoResolution.height) {
-        // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(
-            videoBv,
-            "屏蔽竖屏视频",
-            `${videoInfoDict[videoBv].videoResolution.width} x ${videoInfoDict[videoBv].videoResolution.height}`
-        );
-    }
-}
-
-// 处理匹配 屏蔽充电专属视频
-function handleBlockedChargingExclusive(videoBv) {
-    // 判断设置的屏蔽充电专属视频是否有启用标记
-    if (videoInfoDict[videoBv].videoChargingExclusive) {
-        // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽充电专属的视频", videoInfoDict[videoBv].videoUpName);
+        if (blockedTopCommentHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "屏蔽置顶评论", blockedTopCommentHitItem);
+        }
     }
 }
 
@@ -1636,11 +1718,14 @@ function handleWhitelistNameOrUid(videoBv) {
 
 // 隐藏非视频元素
 function hideNonVideoElements() {
-    // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
-    const floor_single_card_Elements = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
-    floor_single_card_Elements.forEach(function (element) {
-        element.style.display = "none";
-    });
+    // 判断当前页面URL是否以 https://www.bilibili.com/ 开头，即首页
+    if (window.location.href.startsWith("https://www.bilibili.com/")) {
+        // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
+        const floor_single_card_Elements = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
+        floor_single_card_Elements.forEach(function (element) {
+            element.style.display = "none";
+        });
+    }
 
     // 隐藏首页广告，那些没有“enable-no-interest” CSS类的视频卡片元素
     const home_ad_Elements = document.querySelectorAll("div.bili-video-card.is-rcmd:not(.enable-no-interest)");
@@ -1655,9 +1740,9 @@ function hideNonVideoElements() {
         }
     });
 
-    // 隐藏视频播放页右侧广告、视频相关的游戏推荐、大家围观的直播
+    // 隐藏视频播放页右侧广告、视频相关的游戏推荐、视频相关的特殊推荐、大家围观的直播
     const ad_report_Elements = document.querySelectorAll(
-        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.pop-live-small-mode"
+        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.pop-live-small-mode"
     );
     ad_report_Elements.forEach(function (element) {
         element.style.display = "none";
@@ -1924,13 +2009,19 @@ function FuckYouBilibiliRecommendationSystem() {
             handleDoubleBlockedTag(videoBv);
         }
 
+        // API获取视频评论区
+        getVideoApiComments(videoBv);
+
         // 是否启用 屏蔽精选评论的视频
         if (blockedParameter.blockedFilteredCommentsVideo_Switch) {
-            // API获取视频评论区
-            getVideoApiComments(videoBv);
-
             // 判断处理 屏蔽精选评论的视频
             handleBlockedFilteredCommentsVideo(videoBv);
+        }
+
+        // 是否启用 屏蔽置顶评论
+        if (blockedParameter.blockedTopComment_Switch && blockedParameter.blockedTopComment_Array.length > 0) {
+            // 判断处理 屏蔽精选评论的视频
+            handleBlockedTopComment(videoBv);
         }
 
         // 是否启用 白名单Up主和Uid
