@@ -1749,6 +1749,24 @@ function hideNonVideoElements() {
     });
 }
 
+// 叠加层参数(背景)
+GM_addStyle(`
+.blockedOverlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(60, 60, 60, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    border-radius: 6px;
+}
+`);
+
 // 屏蔽或者取消屏蔽
 function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
     // 是白名单目标，是屏蔽目标，没有隐藏、没有叠加层：跳过
@@ -1840,22 +1858,8 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
                 return;
             }
 
-            // 获取 videoElement 的尺寸
-            const elementRect = videoElement.getBoundingClientRect();
-
-            // 叠加层参数(背景)
             let overlay = document.createElement("div");
             overlay.className = "blockedOverlay";
-            overlay.style.position = "absolute";
-            overlay.style.width = elementRect.width + "px"; // 使用 videoElement 的宽度
-            overlay.style.height = elementRect.height + "px"; // 使用 videoElement 的高度
-            overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
-            overlay.style.display = "flex";
-            overlay.style.justifyContent = "center";
-            overlay.style.alignItems = "center";
-            overlay.style.zIndex = "10";
-            overlay.style.backdropFilter = "blur(6px)";
-            overlay.style.borderRadius = "6px";
 
             // 叠加层文本参数(背景)
             let overlayText = document.createElement("div");
