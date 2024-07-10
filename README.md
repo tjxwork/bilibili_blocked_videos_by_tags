@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2024-07-10 18:44:36
+ * @LastEditTime: 2024-07-10 18:52:55
  * @FilePath: \001d:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -18,9 +18,9 @@
 
 # 更新：
 
--   v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；
-    不完善功能修复：每次触发运行时，会将屏蔽叠加背景层与父元素尺寸进行同步，解决了页面布局变化时叠加层不跟随变化，感谢 @Henry-ZHR 的建议；
-    “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏 搜索页——综合 下的 直播卡片
+-   v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；  
+    不完善功能修复：每次触发运行时，会将屏蔽叠加背景层与父元素尺寸进行同步，解决了页面布局变化时叠加层不跟随变化，感谢 @Henry-ZHR 的建议；  
+    “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏 搜索页——综合 下的 直播卡片；
 
 -   v1.1.2 添加新功能：“按置顶评论屏蔽”；  
     注意：“按置顶评论屏蔽”、“屏蔽精选评论的视频” 这两个功能都用到了获取评论的 API，  
