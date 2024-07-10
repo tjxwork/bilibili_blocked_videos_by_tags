@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.2
+// @version         1.1.3
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
+// @note            v1.1.3 v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；
+// @note                   不完善功能修复：每次触发运行时，会将屏蔽叠加背景层与父元素尺寸进行同步，解决了页面布局变化时叠加层不跟随变化，感谢 @Henry-ZHR 的建议；
+// @note                   “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏 搜索页——综合 下的 直播卡片
 // @note            v1.1.2 添加新功能：“按置顶评论屏蔽”；
 // @note                   注意：“按置顶评论屏蔽”、“屏蔽精选评论的视频” 这两个功能都用到了获取评论的API，
 // @note                   这个API对请求频率非常敏感，频繁刷新或者开启新页面会导致B站拒绝请求，正常浏览一般不会出现拒绝问题。
@@ -26,7 +29,6 @@
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
 // @match           https://www.bilibili.com/*
-// @match           https://search.bilibili.com/*
 // @match           https://www.bilibili.com/v/popular/all/*
 // @match           https://www.bilibili.com/v/popular/weekly/*
 // @match           https://www.bilibili.com/v/popular/history/*
@@ -40,6 +42,8 @@
 // @exclude         https://www.bilibili.com/v/virtual/*
 // @exclude         https://www.bilibili.com/v/popular/music/*
 // @exclude         https://www.bilibili.com/v/popular/drama/*
+// @match           https://search.bilibili.com/*
+// @exclude         https://search.bilibili.com/live
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
@@ -451,7 +455,8 @@ GM_addStyle(`
         .recommended-container_floor-aside .container.is-version8>*:nth-of-type(n + 13) {
             margin-top: 0;
         }
-    }
+}
+
 `);
 
 // 菜单UI的HTML
@@ -1054,6 +1059,26 @@ function getBvAndTitle(videoElement) {
     // Bv号
     let videoBv;
 
+    // Av号转Bv号，用于兼容 bv2av (https://greasyfork.org/zh-CN/scripts/398535)，代码来源：https://socialsisteryi.github.io/bilibili-API-collect/docs/misc/bvid_desc.html#bv-av%E7%AE%97%E6%B3%95
+    function av2bv(aid) {
+        const XOR_CODE = 23442827791579n;
+        const MASK_CODE = 2251799813685247n;
+        const MAX_AID = 1n << 51n;
+        const BASE = 58n;
+        const data = "FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf";
+        const bytes = ["B", "V", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0"];
+        let bvIndex = bytes.length - 1;
+        let tmp = (MAX_AID | BigInt(aid)) ^ XOR_CODE;
+        while (tmp > 0) {
+            bytes[bvIndex] = data[Number(tmp % BigInt(BASE))];
+            tmp = tmp / BASE;
+            bvIndex -= 1;
+        }
+        [bytes[3], bytes[9]] = [bytes[9], bytes[3]];
+        [bytes[4], bytes[7]] = [bytes[7], bytes[4]];
+        return bytes.join("");
+    }
+
     // 循环处理所有a标签链接
     for (let videoLinkElement of videoLinkElements) {
         // 处理排行榜的多链接特殊情况，符合就跳过
@@ -1061,14 +1086,23 @@ function getBvAndTitle(videoElement) {
             continue;
         }
 
-        // 获取的链接，如果与Bv链接的格式不匹配的话，就跳过
-        let videoBvTemp = videoLinkElement.href.match(/\/(BV\w+)/);
-        if (!videoBvTemp) {
-            continue;
+        // 获取的链接，如果是Av链接的格式
+        let videoAvTemp = videoLinkElement.href.match(/\/(av)(\d+)/);
+        if (videoAvTemp) {
+            // 从链接中获取Av号 转为 Bv号
+            videoBv = av2bv(videoAvTemp[2]);
         }
 
-        // 从链接中获取到 视频Bv号
-        videoBv = videoBvTemp[1];
+        // 获取的链接，如果是Bv链接的格式
+        let videoBvTemp = videoLinkElement.href.match(/\/(BV\w+)/);
+        if (videoBvTemp) {
+            // 从链接中获取到 视频Bv号
+            videoBv = videoBvTemp[1];
+        }
+
+        if (!videoBv) {
+            continue;
+        }
 
         // 确保 videoInfoDict[videoBv] 已定义
         if (!videoInfoDict[videoBv]) {
@@ -1187,8 +1221,8 @@ function getVideoApiInfo(videoBv) {
             // API获取的UP主Uid:
             videoInfoDict[videoBv].videoUpUid = videoApiInfoJson.data.owner.mid;
 
-            // // API获取的视频AVid:
-            // videoInfoDict[videoBv].videoAVid = videoApiInfoJson.data.aid;
+            // API获取的视频AVid:
+            videoInfoDict[videoBv].videoAVid = videoApiInfoJson.data.aid;
 
             // API获取的视频时长
             videoInfoDict[videoBv].videoDuration = videoApiInfoJson.data.duration;
@@ -1235,7 +1269,7 @@ function getVideoApiInfo(videoBv) {
 
             FuckYouBilibiliRecommendationSystem();
         })
-        .catch((error) => console.error(videoBv, "getVideoApiInfo() Fetch错误:", error));
+        .catch((error) => consoleLogOutput(videoBv, "getVideoApiInfo() Fetch错误:", error));
 }
 
 // 处理匹配短时长视频
@@ -1435,7 +1469,7 @@ function getVideoApiTags(videoBv) {
 
             FuckYouBilibiliRecommendationSystem();
         })
-        .catch((error) => console.error(videoBv, "getVideoApiTags() Fetch错误:", error));
+        .catch((error) => consoleLogOutput(videoBv, "getVideoApiTags() Fetch错误:", error));
 }
 
 // 处理匹配的屏蔽标签
@@ -1633,7 +1667,7 @@ function getVideoApiComments(videoBv) {
 
                 FuckYouBilibiliRecommendationSystem();
             })
-            .catch((error) => console.error(videoBv, "getVideoApiComments() Fetch错误:", error));
+            .catch((error) => consoleLogOutput(videoBv, "getVideoApiComments() Fetch错误:", error));
     }, apiRequestDelayTime);
 
     // 每次调用增加的延迟
@@ -1721,15 +1755,25 @@ function hideNonVideoElements() {
     // 判断当前页面URL是否以 https://www.bilibili.com/ 开头，即首页
     if (window.location.href.startsWith("https://www.bilibili.com/")) {
         // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
-        const floor_single_card_Elements = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
-        floor_single_card_Elements.forEach(function (element) {
+        const adElements_1 = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
+        adElements_1.forEach(function (element) {
+            element.style.display = "none";
+        });
+    }
+
+    // 判断当前页面URL是否以 https://search.bilibili.com/all 开头，即搜索页——综合
+    if (window.location.href.startsWith("https://search.bilibili.com/all")) {
+        // 隐藏 搜索页——综合 下的 直播卡片
+        const adElements_2 = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--living)");
+        adElements_2.forEach(function (element) {
+            element.parentNode.style.display = "none";
             element.style.display = "none";
         });
     }
 
     // 隐藏首页广告，那些没有“enable-no-interest” CSS类的视频卡片元素
-    const home_ad_Elements = document.querySelectorAll("div.bili-video-card.is-rcmd:not(.enable-no-interest)");
-    home_ad_Elements.forEach(function (element) {
+    const adElements_3 = document.querySelectorAll("div.bili-video-card.is-rcmd:not(.enable-no-interest)");
+    adElements_3.forEach(function (element) {
         // 检查其父元素是否是 .feed-card
         if (element.closest("div.feed-card") !== null) {
             // 如果是，选择其父元素并应用样式
@@ -1741,31 +1785,13 @@ function hideNonVideoElements() {
     });
 
     // 隐藏视频播放页右侧广告、视频相关的游戏推荐、视频相关的特殊推荐、大家围观的直播
-    const ad_report_Elements = document.querySelectorAll(
+    const adElements_4 = document.querySelectorAll(
         "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.pop-live-small-mode"
     );
-    ad_report_Elements.forEach(function (element) {
+    adElements_4.forEach(function (element) {
         element.style.display = "none";
     });
 }
-
-// 叠加层参数(背景)
-GM_addStyle(`
-.blockedOverlay {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: rgba(60, 60, 60, 0.85);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10;
-    backdrop-filter: blur(6px);
-    border-radius: 6px;
-}
-`);
 
 // 屏蔽或者取消屏蔽
 function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
@@ -1858,8 +1884,22 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
                 return;
             }
 
+            // 获取 videoElement 的尺寸
+            const elementRect = videoElement.getBoundingClientRect();
+
+            // 叠加层参数(背景)
             let overlay = document.createElement("div");
             overlay.className = "blockedOverlay";
+            overlay.style.position = "absolute";
+            overlay.style.width = elementRect.width + "px"; // 使用 videoElement 的宽度
+            overlay.style.height = elementRect.height + "px"; // 使用 videoElement 的高度
+            overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
+            overlay.style.display = "flex";
+            overlay.style.justifyContent = "center";
+            overlay.style.alignItems = "center";
+            overlay.style.zIndex = "10";
+            overlay.style.backdropFilter = "blur(6px)";
+            overlay.style.borderRadius = "6px";
 
             // 叠加层文本参数(背景)
             let overlayText = document.createElement("div");
@@ -1901,6 +1941,20 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
             }
         }
     }
+}
+
+// 同步屏蔽叠加层与父元素的尺寸
+function syncBlockedOverlayAndParentNodeRect() {
+    // 获取所有的屏蔽叠加层
+    const blockedOverlays = document.querySelectorAll("div.blockedOverlay");
+
+    blockedOverlays.forEach(function (element) {
+        // 获取父元素的尺寸
+        const parentNodeElementRect = element.parentNode.getBoundingClientRect();
+        // 修改屏蔽叠加层的大小
+        element.style.width = parentNodeElementRect.width + "px"; // 使用 父元素的尺寸 的宽度
+        element.style.height = parentNodeElementRect.height + "px"; // 使用 父元素的尺寸 的高度
+    });
 }
 
 // -----------------主流程函数----------------------
@@ -2036,11 +2090,17 @@ function FuckYouBilibiliRecommendationSystem() {
 
         // 屏蔽或者取消屏蔽
         blockedOrUnblocked(videoElement, videoBv);
+
+        // 同步屏蔽叠加层与父元素的尺寸
+        syncBlockedOverlayAndParentNodeRect();
     }
 }
 
 // 页面加载完成后运行脚本
 window.addEventListener("load", FuckYouBilibiliRecommendationSystem);
+
+// 窗口尺寸变化时运行脚本
+window.addEventListener("resize", FuckYouBilibiliRecommendationSystem);
 
 // 定义 MutationObserver 的回调函数
 function mutationCallback() {
