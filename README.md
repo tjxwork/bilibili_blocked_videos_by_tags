@@ -2,8 +2,8 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2024-07-10 18:52:55
- * @FilePath: \001d:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
+ * @LastEditTime: 2024-07-11 15:31:04
+ * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
  * Copyright (c) 2024 by tjxwork, All Rights Reserved.
@@ -14,17 +14,21 @@
 对 Bilibili.com 的视频卡片元素，以标签、标题、UP 主、分区、时长、播放量、点赞率、竖屏、充电专属、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频。
 
 作者的爱发电：[https://afdian.net/a/tjxgame](https://afdian.net/a/tjxgame)  
-欢迎订阅支持！你的支持就是维护的动力！
+欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 
 # 更新：
+
+-   v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。
+    感谢来自爱发电的赞助需求。
 
 -   v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；  
     不完善功能修复：每次触发运行时，会将屏蔽叠加背景层与父元素尺寸进行同步，解决了页面布局变化时叠加层不跟随变化，感谢 @Henry-ZHR 的建议；  
     “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏 搜索页——综合 下的 直播卡片；
 
 -   v1.1.2 添加新功能：“按置顶评论屏蔽”；  
-    注意：“按置顶评论屏蔽”、“屏蔽精选评论的视频” 这两个功能都用到了获取评论的 API，  
-    **这个 API 对请求频率非常敏感，频繁刷新或者开启新页面会导致 B 站拒绝请求，已经尽量做了错开请求处理，正常浏览一般不会出现拒绝问题。**
+    注意：“按置顶评论屏蔽”、“屏蔽精选评论的视频” 这两个功能都用到了获取评论的 API。  
+    **这个 API 对请求频率非常敏感，频繁刷新或者开启新页面会导致 B 站拒绝请求，导致此 API 相关功能失效**  
+    已经尽量做了错开请求处理，正常浏览一般不会出现拒绝问题，但是相关功能无法保证 100%可用。
 
 -   v1.1.1 添加新功能：“屏蔽充电专属的视频”。
 
@@ -87,7 +91,9 @@
 
 # 脚本兼容测试通过：
 
-[bilibili-app-recommend](https://greasyfork.org/zh-CN/scripts/443530-bilibili-app-recommend) （为 B 站首页添加像 App 一样的推荐）
+[bilibili-app-recommend](https://greasyfork.org/zh-CN/scripts/443530) （为 B 站首页添加像 App 一样的推荐）
+
+[bv2av](https://greasyfork.org/zh-CN/scripts/398535) （将视频链接替换为旧的 AV 号链接）
 
 ‍
 

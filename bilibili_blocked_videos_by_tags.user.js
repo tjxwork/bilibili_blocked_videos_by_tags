@@ -1,13 +1,18 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.3
+// @version         1.1.4
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
-// @note            v1.1.3 v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；
+// @note            作者的爱发电：https://afdian.net/a/tjxgame
+// @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
+// @note
+// @note            v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。
+// @note                   感谢来自爱发电的赞助需求。
+// @note            v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；
 // @note                   不完善功能修复：每次触发运行时，会将屏蔽叠加背景层与父元素尺寸进行同步，解决了页面布局变化时叠加层不跟随变化，感谢 @Henry-ZHR 的建议；
 // @note                   “隐藏首页等页面的非视频元素” 功能生效范围增加：隐藏 搜索页——综合 下的 直播卡片
 // @note            v1.1.2 添加新功能：“按置顶评论屏蔽”；
@@ -49,8 +54,8 @@
 // @grant           GM_getValue
 // @grant           GM_addStyle
 // @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
-// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
-// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
+// @downloadURL     https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
+// @updateURL       https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
@@ -116,6 +121,9 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
 
     // 隐藏非视频元素
     hideNonVideoElements_Switch: true,
+
+    // 屏蔽叠加层的提示只显示类型而不显示命中项
+    blockedOverlayOnlyDisplaysType_Switch: false,
 
     // 隐藏视频而非叠加层模式
     hideVideoMode_Switch: false,
@@ -267,7 +275,7 @@ GM_addStyle(`
 }
 
 #menuTitle {
-    font-size: 18px;
+    font-size: 17px;
     text-align: center;
     margin: 10px;
 }
@@ -463,206 +471,206 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-<div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.0</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.1.4</div>
 
-<div id="menuOptionsList">
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽 </label>
+    <div id="menuOptionsList">
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽 </label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_UseRegular" />启用正则</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedTitle_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTitle_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedTitle_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTitle_Array)">×</button>
+                </li>
+            </ul>
         </div>
 
-        <div class="titleLabelRight">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_UseRegular" />启用正则</label>
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_UseRegular" />启用正则</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedNameOrUid_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedNameOrUid_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedNameOrUid_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedNameOrUid_Array)">×</button>
+                </li>
+            </ul>
         </div>
 
-        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-            v-model="tempInputValue.blockedTitle_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTitle_Array')">添加</button>
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽</label>
+            </div>
 
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.blockedTitle_Array">
-                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTitle_Array)">×</button>
-            </li>
-        </ul>
-    </div>
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则</label>
+            </div>
 
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽</label>
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedVideoPartitions_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
+                    {{value}}<button
+                        @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
+                </li>
+            </ul>
         </div>
 
-        <div class="titleLabelRight">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_UseRegular" />启用正则</label>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTag_UseRegular" />启用正则</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedTag_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTag_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedTag_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTag_Array)">×</button>
+                </li>
+            </ul>
         </div>
 
-        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-            v-model="tempInputValue.blockedNameOrUid_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedNameOrUid_Array')">添加</button>
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽</label>
+            </div>
 
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.blockedNameOrUid_Array">
-                {{value}}<button
-                    @click="delArrayButton(index, menuUiSettings.blockedNameOrUid_Array)">×</button>
-            </li>
-        </ul>
-    </div>
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_UseRegular" />启用正则</label>
+            </div>
 
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
+            <input type="text" placeholder='多项输入请用英文逗号间隔(以"A标签|B标签"格式添加)' spellcheck="false"
+                v-model="tempInputValue.doubleBlockedTag_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'doubleBlockedTag_Array' )">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.doubleBlockedTag_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.doubleBlockedTag_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽 </label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_UseRegular" />启用正则</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedTopComment_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTopComment_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedTopComment_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTopComment_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox"
+                        v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(白名单)</label>
+            </div>
+
+            <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
+                v-model="tempInputValue.whitelistNameOrUid_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'whitelistNameOrUid_Array' )">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.whitelistNameOrUid_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.whitelistNameOrUid_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox" v-model="menuUiSettings.blockedShortDuration_Switch" />屏蔽低于指定时长的视频</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedShortDuration" />
+            <label>秒</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox"
+                        v-model="menuUiSettings.blockedBelowVideoViews_Switch" />屏蔽低于指定播放量的视频</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowVideoViews" />
+            <label>次</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label><input type="checkbox"
+                        v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于指定点赞率的视频</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
+            <label>%</label>
+        </div>
+
+
+        <div class="menuOptions">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedPortraitVideo_Switch" />屏蔽竖屏视频</label>
+        </div>
+
+        <div class="menuOptions">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频</label>
+        </div>
+
+        <div class="menuOptions">
             <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽</label>
+                    v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频</label>
         </div>
 
-        <div class="titleLabelRight">
+        <div class="menuOptions">
             <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则</label>
+                    v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素</label>
         </div>
 
-        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-            v-model="tempInputValue.blockedVideoPartitions_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
-
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
-                {{value}}<button
-                    @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
-            </li>
-        </ul>
-    </div>
-
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽</label>
+        <div class="menuOptions">
+            <label><input type="checkbox" v-model="menuUiSettings.blockedOverlayOnlyDisplaysType_Switch" />屏蔽叠加层的提示只显示类型</label>
         </div>
 
-        <div class="titleLabelRight">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTag_UseRegular" />启用正则</label>
+        <div class="menuOptions">
+            <label><input type="checkbox" v-model="menuUiSettings.hideVideoMode_Switch" />隐藏视频而不是使用叠加层覆盖</label>
         </div>
 
-        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-            v-model="tempInputValue.blockedTag_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTag_Array')">添加</button>
-
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.blockedTag_Array">
-                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTag_Array)">×</button>
-            </li>
-        </ul>
-    </div>
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽</label>
+        <div class="menuOptions">
+            <label><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关</label>
         </div>
 
-        <div class="titleLabelRight">
-            <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_UseRegular" />启用正则</label>
-        </div>
-
-        <input type="text" placeholder='多项输入请用英文逗号间隔(以"A标签|B标签"格式添加)' spellcheck="false"
-            v-model="tempInputValue.doubleBlockedTag_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'doubleBlockedTag_Array' )">添加</button>
-
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.doubleBlockedTag_Array">
-                {{value}}<button
-                    @click="delArrayButton(index, menuUiSettings.doubleBlockedTag_Array)">×</button>
-            </li>
-        </ul>
-    </div>
-
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽 </label>
-        </div>
-
-        <div class="titleLabelRight">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_UseRegular" />启用正则</label>
-        </div>
-
-        <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-            v-model="tempInputValue.blockedTopComment_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTopComment_Array')">添加</button>
-
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.blockedTopComment_Array">
-                {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTopComment_Array)">×</button>
-            </li>
-        </ul>
-    </div>
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(白名单)</label>
-        </div>
-
-        <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
-            v-model="tempInputValue.whitelistNameOrUid_Array" /><button
-            @click="addArrayButton(tempInputValue, menuUiSettings, 'whitelistNameOrUid_Array' )">添加</button>
-
-        <ul>
-            <li v-for="(value, index) in menuUiSettings.whitelistNameOrUid_Array">
-                {{value}}<button
-                    @click="delArrayButton(index, menuUiSettings.whitelistNameOrUid_Array)">×</button>
-            </li>
-        </ul>
-    </div>
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedShortDuration_Switch" />屏蔽低于指定时长的视频</label>
-        </div>
-        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedShortDuration" />
-        <label>秒</label>
-    </div>
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedBelowVideoViews_Switch" />屏蔽低于指定播放量的视频</label>
-        </div>
-        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowVideoViews" />
-        <label>次</label>
-    </div>
-
-    <div class="menuOptions">
-        <div class="titleLabelLeft">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于指定点赞率的视频</label>
-        </div>
-        <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
-        <label>%</label>
-    </div>
-
-
-    <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.blockedPortraitVideo_Switch" />屏蔽竖屏视频</label>
-    </div>
-
-    <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频</label>
-    </div>
-
-    <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频</label>
-    </div>
-
-    <div class="menuOptions">
-        <label><input type="checkbox"
-                v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素（直播、番剧、广告……）</label>
-    </div>
-
-    <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.hideVideoMode_Switch" />隐藏视频而不是使用叠加层覆盖</label>
-    </div>
-
-    <div class="menuOptions">
-        <label><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关</label>
-    </div>
     </div>
 
     <div id="menuButtonContainer">
@@ -1042,7 +1050,14 @@ function markAsBlockedTarget(videoBv, blockedType, blockedItem) {
         videoInfoDict[videoBv].triggeredBlockedRules = [];
     }
 
-    let blockedRulesItem = blockedType + ": " + blockedItem;
+    let blockedRulesItem;
+
+    // 屏蔽叠加层的提示只显示类型而不显示命中项
+    if (blockedParameter.blockedOverlayOnlyDisplaysType_Switch) {
+        blockedRulesItem = blockedType;
+    } else {
+        blockedRulesItem = blockedType + ": " + blockedItem;
+    }
 
     // 检查是否已经这条记录
     if (!videoInfoDict[videoBv].triggeredBlockedRules.includes(blockedRulesItem)) {
