@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2024-07-11 15:31:04
+ * @LastEditTime: 2024-07-18 23:10:23
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -13,12 +13,14 @@
 
 对 Bilibili.com 的视频卡片元素，以标签、标题、UP 主、分区、时长、播放量、点赞率、竖屏、充电专属、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频。
 
-作者的爱发电：[https://afdian.net/a/tjxgame](https://afdian.net/a/tjxgame)  
+作者的爱发电：[https://afdian.com/a/tjxgame](https://afdian.com/a/tjxgame)  
 欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 
 # 更新：
 
--   v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。
+-   v1.1.5 修正导致缓存记录对象的 videoLink 记录出错的部分代码; 修改赞助按钮的跳出连接; (我真的是不知道什么鬼运气，去哪哪崩，刚开的爱发电也崩了。)
+
+-   v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。  
     感谢来自爱发电的赞助需求。
 
 -   v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；  
@@ -114,5 +116,5 @@
 
 ![](https://tc.dhmip.cn/imgs/2023/12/09/a8e5fff3320dc195.png)
 
-作者的爱发电：[https://afdian.net/a/tjxgame](https://afdian.net/a/tjxgame)  
+作者的爱发电：[https://afdian.com/a/tjxgame](https://afdian.com/a/tjxgame)  
 也可以用爱发电按月订阅支持！

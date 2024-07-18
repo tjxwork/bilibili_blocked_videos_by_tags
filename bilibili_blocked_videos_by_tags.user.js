@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.4
+// @version         1.1.5
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note
-// @note            作者的爱发电：https://afdian.net/a/tjxgame
+// @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.1.5 修正导致缓存记录对象的 videoLink 记录出错的部分代码; 修改赞助按钮的跳出连接; (我真的是不知道什么鬼运气，去哪哪崩，刚开的爱发电也崩了。)
 // @note            v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。
 // @note                   感谢来自爱发电的赞助需求。
 // @note            v1.1.3 兼容脚本处理：[bv2av](https://greasyfork.org/zh-CN/scripts/398535)(此脚本会将视频链接替换为旧的 AV 号链接)，感谢 @Henry-ZHR 的提出；
@@ -454,15 +455,13 @@ GM_addStyle(`
     transition: opacity 1s;
 }
 
-@media (min-width: 1560px) and (max-width: 2059.9px) {
-    .recommended-container_floor-aside .container>*:nth-of-type(n + 8) {
-        margin-top: 0;
-    }
-
-    @media (min-width: 1560px) and (max-width: 2059.9px) {
-        .recommended-container_floor-aside .container.is-version8>*:nth-of-type(n + 13) {
-            margin-top: 0;
-        }
+/* 支付宝微信二维码 */
+#alipayWeChatQrCode {
+    position: fixed;
+    top: 52%;
+    left: 16%;
+    transform: translate(0%, -50%);
+    box-shadow: 0 8px 8px rgb(85 85 85 / 85%);
 }
 
 `);
@@ -684,6 +683,11 @@ let menuUiHTML = `
         <label :style="{ opacity: tempInputValue.promptText_Opacity }"
             v-show="tempInputValue.promptText_Switch">{{tempInputValue.promptText}}</label>
     </div>
+
+    <div id="alipayWeChatQrCode" v-show="tempInputValue.QrCode_Switch">
+        <img src="https://tc.dhmip.cn/imgs/2023/12/09/a8e5fff3320dc195.png" alt="感谢赞助">
+    </div>
+
 </div>
 
 `;
@@ -725,6 +729,8 @@ function blockedMenuUi() {
                 promptText_Switch: true,
                 promptText_Opacity: 0,
                 promptText: "",
+                // 二维码显示开关
+                QrCode_Switch: false,
             });
 
             function showPromptText(text) {
@@ -855,9 +861,15 @@ function blockedMenuUi() {
 
             // 赞助作者
             const supportButton = () => {
-                setTimeout(() => {
-                    window.open("https://afdian.net/a/tjxgame", "_blank");
-                }, 1000);
+                if (!tempInputValue.QrCode_Switch) {
+                    setTimeout(() => {
+                        window.open("https://afdian.com/a/tjxgame", "_blank");
+                    }, 1000);
+                    tempInputValue.QrCode_Switch = true;
+                } else {
+                    tempInputValue.QrCode_Switch = false;
+                }
+
                 showPromptText("感谢老板！");
             };
 
@@ -1096,6 +1108,11 @@ function getBvAndTitle(videoElement) {
 
     // 循环处理所有a标签链接
     for (let videoLinkElement of videoLinkElements) {
+        // 已经有Bv号不需要继续了，跳过
+        if (videoBv) {
+            continue;
+        }
+
         // 处理排行榜的多链接特殊情况，符合就跳过
         if (videoLinkElement.className == "other-link") {
             continue;
@@ -1115,6 +1132,7 @@ function getBvAndTitle(videoElement) {
             videoBv = videoBvTemp[1];
         }
 
+        // 没拿Bv号不需要继续了，跳过
         if (!videoBv) {
             continue;
         }
