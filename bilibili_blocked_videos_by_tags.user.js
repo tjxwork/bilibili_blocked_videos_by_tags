@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.1.5
+// @version         1.2.0
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
@@ -10,6 +10,12 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.2.0 添加新功能：“屏蔽低于指定投币率的视频”，有人觉得有用……但是实际真用处不大，太多人不投币了，1%都能干掉8成视频。
+// @note                   添加新功能：“屏蔽低于指定UP主等级的视频”、“屏蔽低于指定UP主粉丝数的视频”、“按UP主简介屏蔽” 就是增加了UP相关信息的屏蔽，感谢 爱发电用户5f0c2 的赞助需求！
+// @note                   添加新功能：“导出设置”、“导入设置”，其实就是个JSON……
+// @note                   旧功能完善：“隐藏首页等页面的非视频元素” 功能生效范围增加新出现的广告项目、修复了隐藏广告元素导致的对齐问题。
+// @note                   增加了菜单的鼠标停留文字提示（也提示了哪些功能是需要API的）、优化了菜单功能的排序。
+// @note                   再次提醒，频繁大量加载新内容、刷新网页可能会导致B站的API拒绝请求，导致部分功能暂时失效，有相当多的功能是依靠B站的API才能正常工作。
 // @note            v1.1.5 修正导致缓存记录对象的 videoLink 记录出错的部分代码; 修改赞助按钮的跳出连接; (我真的是不知道什么鬼运气，去哪哪崩，刚开的爱发电也崩了。)
 // @note            v1.1.4 添加新功能：“屏蔽叠加层的提示只显示类型”，有部分用户可能连命中的屏蔽词都不想看到，但是又倾向使用叠加层模式，所以增加了这个开关。
 // @note                   感谢来自爱发电的赞助需求。
@@ -30,7 +36,7 @@
 // @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
 // @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
 // @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
-// @description     对Bilibili.com的视频卡片元素，以 标签、标题、时长、UP主名称、UP主UID 等信息来进行判断匹配，添加一个屏蔽叠加层或者隐藏视频。
+// @description     对Bilibili的视频卡片，以标签、标题、UP主、时长、竖屏、充电、评论等信息来屏蔽视频，附带去除视频卡片中的直播、广告、推广内容的功能。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
@@ -55,8 +61,8 @@
 // @grant           GM_getValue
 // @grant           GM_addStyle
 // @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
-// @downloadURL     https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
-// @updateURL       https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
+// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
+// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
@@ -102,6 +108,10 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     blockedBelowLikesRate_Switch: false,
     blockedBelowLikesRate: 0,
 
+    // 屏蔽低于指定投币率的视频
+    blockedBelowCoinRate_Switch: false,
+    blockedBelowCoinRate: 0,
+
     // 屏蔽竖屏视频
     blockedPortraitVideo_Switch: false,
 
@@ -115,6 +125,19 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     blockedTopComment_Switch: false,
     blockedTopComment_UseRegular: true,
     blockedTopComment_Array: [],
+
+    // 屏蔽低于指定UP主等级的视频
+    blockedBelowUpLevel_Switch: false,
+    blockedBelowUpLevel: 0,
+
+    // 屏蔽低于指定UP主粉丝数的视频
+    blockedBelowUpFans_Switch: false,
+    blockedBelowUpFans: 0,
+
+    // 屏蔽包含相关UP主简介的视频
+    blockedUpSigns_Switch: false,
+    blockedUpSigns_UseRegular: true,
+    blockedUpSigns_Array: [],
 
     // 白名单Up主和Uid
     whitelistNameOrUid_Switch: false,
@@ -219,11 +242,11 @@ GM_addStyle(`
 #blockedMenuUi {
     font-size: var(--fontSize);
     position: fixed;
-    bottom: 4vh;
+    bottom: 6vh;
     right: 2vw;
     z-index: 1005;
     width: 460px;
-    max-height: 90vh;
+    max-height: 86vh;
     overflow-y: auto;
     background-color: var(--uiBackgroundColor);
 }
@@ -316,7 +339,7 @@ GM_addStyle(`
 }
 
 #blockedMenuUi input[type="number"] {
-    width: 4em;
+    width: 5em;
     margin: 0 5px;
     padding: 0 5px;
     text-align: right;
@@ -351,7 +374,7 @@ GM_addStyle(`
     padding: 0;
     margin-bottom: 5px;
     margin-left: 5px;
-    width: 45px;
+    width: 47px;
     vertical-align: middle;
     background-color: var(--uiButtonColor);
     transition: background-color 0.1s ease;
@@ -440,19 +463,24 @@ GM_addStyle(`
     background-color: var(--uiButtonColor);
 }
 
-#menuButtonContainer label {
-    line-height: 45px;
+
+/* 提示框样式 */
+#blockedMenuPrompt {
+    position: fixed;
+    bottom: calc(6vh - 37px);
+    right: calc(2vw + 7px);
+    z-index: 1006; /* 高于菜单的z-index */
+    line-height: 30px;
     border-radius: var(--borderRadius);
-    display: inline-block;
-    border: 0;
-    padding: 0;
-    margin: 10px 20px;
-    height: 45px;
-    width: 130px;
+    padding: 0 15px;
+    margin: 0;
+    height: 30px;
     vertical-align: middle;
     text-align: center;
     background-color: var(--uiInputBoxBackgroundColor);
-    transition: opacity 1s;
+    transition: opacity 0.5s ease;
+    pointer-events: none; /* 防止阻挡点击操作 */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 /* 支付宝微信二维码 */
@@ -464,22 +492,41 @@ GM_addStyle(`
     box-shadow: 0 8px 8px rgb(85 85 85 / 85%);
 }
 
+/* 修正隐藏元素后导致的对齐问题 */
+@media (min-width: 2060px),
+       (min-width: 1560px) and (max-width: 2059.9px),
+       (min-width: 1400px) and (max-width: 1559.9px) {
+    .recommended-container_floor-aside .container>*:nth-of-type(n + 8),
+    .recommended-container_floor-aside .container.is-version8>*:nth-of-type(n + 13) {
+        margin-top: 0;
+    }
+}
+
+/* 修正隐藏元素后导致的对齐问题 */
+@media (min-width: 1300px) and (max-width: 1399.9px),
+       (max-width: 1139.9px) {
+    .recommended-container_floor-aside .container>*:nth-of-type(n + 6),
+    .recommended-container_floor-aside .container.is-version8>*:nth-of-type(n + 13) {
+        margin-top: 0;
+    }
+}
+
 `);
 
 // 菜单UI的HTML
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.1.4</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.2.0</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽 </label>
+                <label title="不需要API，网页上直接有标题信息"><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽(?)</label>
             </div>
 
             <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTitle_UseRegular" />启用正则</label>
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedTitle_UseRegular" />启用正则(?)</label>
             </div>
 
             <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
@@ -495,11 +542,11 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽</label>
+                <label title="大部分情况也是可以在网页上直接拿到"><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽(?)</label>
             </div>
 
             <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_UseRegular" />启用正则</label>
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_UseRegular" />启用正则(?)</label>
             </div>
 
             <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
@@ -513,35 +560,16 @@ let menuUiHTML = `
             </ul>
         </div>
 
-        <div class="menuOptions">
-            <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽</label>
-            </div>
 
-            <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则</label>
-            </div>
-
-            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-                v-model="tempInputValue.blockedVideoPartitions_Array" /><button
-                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
-
-            <ul>
-                <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
-                    {{value}}<button
-                        @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
-                </li>
-            </ul>
-        </div>
 
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽</label>
+                <label title="标签API，要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽(?)</label>
             </div>
 
             <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTag_UseRegular" />启用正则</label>
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedTag_UseRegular" />启用正则(?)</label>
             </div>
 
             <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
@@ -557,11 +585,11 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽</label>
+                <label title="标签API，要同时存在2个标签时才会生效，要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽(?)</label>
             </div>
 
             <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_UseRegular" />启用正则</label>
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_UseRegular" />启用正则(?)</label>
             </div>
 
             <input type="text" placeholder='多项输入请用英文逗号间隔(以"A标签|B标签"格式添加)' spellcheck="false"
@@ -576,13 +604,119 @@ let menuUiHTML = `
         </div>
 
 
+
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽 </label>
+                <label title="视频API，现在视频的分区可能不是很好确定名字，可以看日志来判断"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽(?)</label>
             </div>
 
             <div class="titleLabelRight">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedTopComment_UseRegular" />启用正则</label>
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则(?)</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedVideoPartitions_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
+                    {{value}}<button
+                        @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="menuOptions">
+            <label title="视频API，是拿到视频的分辨率后判断的"><input type="checkbox" v-model="menuUiSettings.blockedPortraitVideo_Switch" />屏蔽竖屏视频(?)</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="视频API，是拿到视频的时长后判断的"><input type="checkbox" v-model="menuUiSettings.blockedShortDuration_Switch" />屏蔽低于此时长的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedShortDuration" />
+            <label>秒</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="视频API，是拿到视频的播放量后判断的"><input type="checkbox"
+                        v-model="menuUiSettings.blockedBelowVideoViews_Switch" />屏蔽低于此播放量的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowVideoViews" />
+            <label>次</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="视频API，是拿到视频的播放量和点赞数后判断的"><input type="checkbox"
+                        v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于此点赞率的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
+            <label>%</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="视频API，是拿到视频的播放量和投币数后判断的，实用性不高"><input type="checkbox"
+                        v-model="menuUiSettings.blockedBelowCoinRate_Switch" />屏蔽低于此投币率的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowCoinRate" />
+            <label>%</label>
+        </div>
+
+        <div class="menuOptions">
+            <label title="视频API，是拿到视频的充电视频标记后判断的"><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频(?)</label>
+        </div>
+
+
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="UP主API，是拿到UP主的等级信息后判断的"><input type="checkbox" v-model="menuUiSettings.blockedBelowUpLevel_Switch" />屏蔽低于此UP主等级的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowUpLevel" />
+            <label>级</label>
+        </div>
+
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="UP主API，是拿到UP主的等粉丝数后判断的"><input type="checkbox" v-model="menuUiSettings.blockedBelowUpFans_Switch" />屏蔽低于此UP主粉丝数的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowUpFans" />
+            <label>人</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="UP主API，是拿到UP主的简介后判断的"><input type="checkbox" v-model="menuUiSettings.blockedUpSigns_Switch" />按UP主简介屏蔽(?)</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedUpSigns_UseRegular" />启用正则(?)</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedUpSigns_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedUpSigns_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedUpSigns_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedUpSigns_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="评论API，极易请求过多导致拒绝"><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽(?)</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedTopComment_UseRegular" />启用正则(?)</label>
             </div>
 
             <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
@@ -597,9 +731,16 @@ let menuUiHTML = `
         </div>
 
         <div class="menuOptions">
+            <label title="评论API，极易请求过多导致拒绝"><input type="checkbox"
+                    v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频(?)</label>
+        </div>
+
+        
+
+        <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label><input type="checkbox"
-                        v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(白名单)</label>
+                <label title="白名单，在最后进行的判断，有最高的优先级"><input type="checkbox"
+                        v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(?)</label>
             </div>
 
             <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
@@ -613,61 +754,23 @@ let menuUiHTML = `
             </ul>
         </div>
 
+        
+
         <div class="menuOptions">
-            <div class="titleLabelLeft">
-                <label><input type="checkbox" v-model="menuUiSettings.blockedShortDuration_Switch" />屏蔽低于指定时长的视频</label>
-            </div>
-            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedShortDuration" />
-            <label>秒</label>
+            <label title="基本就是去广告、去直播、去综艺、去国漫之类的非投稿视频内容"><input type="checkbox"
+                    v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素(?)</label>
         </div>
 
         <div class="menuOptions">
-            <div class="titleLabelLeft">
-                <label><input type="checkbox"
-                        v-model="menuUiSettings.blockedBelowVideoViews_Switch" />屏蔽低于指定播放量的视频</label>
-            </div>
-            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowVideoViews" />
-            <label>次</label>
+            <label title="防止你连屏蔽词都恶心"><input type="checkbox" v-model="menuUiSettings.blockedOverlayOnlyDisplaysType_Switch" />屏蔽叠加层的提示只显示类型(?)</label>
         </div>
 
         <div class="menuOptions">
-            <div class="titleLabelLeft">
-                <label><input type="checkbox"
-                        v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于指定点赞率的视频</label>
-            </div>
-            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
-            <label>%</label>
-        </div>
-
-
-        <div class="menuOptions">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedPortraitVideo_Switch" />屏蔽竖屏视频</label>
+            <label title="我基本不用这个，为了方便判断屏蔽效果和范围"><input type="checkbox" v-model="menuUiSettings.hideVideoMode_Switch" />隐藏视频而不是使用叠加层覆盖(?)</label>
         </div>
 
         <div class="menuOptions">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频</label>
-        </div>
-
-        <div class="menuOptions">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频</label>
-        </div>
-
-        <div class="menuOptions">
-            <label><input type="checkbox"
-                    v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素</label>
-        </div>
-
-        <div class="menuOptions">
-            <label><input type="checkbox" v-model="menuUiSettings.blockedOverlayOnlyDisplaysType_Switch" />屏蔽叠加层的提示只显示类型</label>
-        </div>
-
-        <div class="menuOptions">
-            <label><input type="checkbox" v-model="menuUiSettings.hideVideoMode_Switch" />隐藏视频而不是使用叠加层覆盖</label>
-        </div>
-
-        <div class="menuOptions">
-            <label><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关</label>
+            <label title="你可以看到一堆的报错！"><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关(?)</label>
         </div>
 
     </div>
@@ -676,16 +779,20 @@ let menuUiHTML = `
         <button @click="refreshButton()">读取</button>
         <button @click="saveButton()">保存</button>
         <button @click="closeButton()">关闭</button>
+        <button @click="exportButton()">导出</button>
+        <button @click="importButton()">导入</button>
         <button @click="authorButton()">作者</button>
         <button @click="supportButton()">赞助</button>
 
-
-        <label :style="{ opacity: tempInputValue.promptText_Opacity }"
-            v-show="tempInputValue.promptText_Switch">{{tempInputValue.promptText}}</label>
-    </div>
-
     <div id="alipayWeChatQrCode" v-show="tempInputValue.QrCode_Switch">
         <img src="https://tc.dhmip.cn/imgs/2023/12/09/a8e5fff3320dc195.png" alt="感谢赞助">
+    </div>
+
+    <!-- 添加提示框 -->
+    <div id="blockedMenuPrompt" 
+        :style="{ opacity: tempInputValue.promptText_Opacity }"
+        v-show="tempInputValue.promptText_Switch">
+        {{tempInputValue.promptText}}
     </div>
 
 </div>
@@ -724,6 +831,7 @@ function blockedMenuUi() {
                 blockedTag_Array: "",
                 doubleBlockedTag_Array: "",
                 blockedTopComment_Array: "",
+                blockedUpSigns_Array: "",
                 whitelistNameOrUid_Array: "",
                 // 临时提示文本
                 promptText_Switch: true,
@@ -733,6 +841,7 @@ function blockedMenuUi() {
                 QrCode_Switch: false,
             });
 
+            // 显示临时提示文本
             function showPromptText(text) {
                 // tempInputValue.promptText_Switch = true; // 显示 label 元素
                 tempInputValue.promptText_Opacity = 1;
@@ -851,6 +960,86 @@ function blockedMenuUi() {
                 }
             };
 
+            // 导出设置
+            const exportButton = () => {
+                try {
+                    const rawSettings = toRaw(menuUiSettings);
+                    const jsonString = JSON.stringify(rawSettings, null, 2);
+                    const blob = new Blob([jsonString], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `Bilibili_blocked_videos_by_tags_Config_${formatTimestamp({ separator: "-_-" })}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    showPromptText("设置导出成功");
+                } catch (error) {
+                    showPromptText("导出失败");
+                    console.error("导出设置时出错:", error);
+                }
+            };
+
+            // 导入设置
+            const importButton = () => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "application/json";
+
+                input.onchange = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    try {
+                        // 读取文件内容
+                        const fileContent = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = (e) => reject(e.target.error);
+                            reader.readAsText(file);
+                        });
+
+                        // 解析和验证数据
+                        const importedData = JSON.parse(fileContent);
+                        if (!validateSettings(importedData)) {
+                            throw new Error("无效的配置文件");
+                        }
+
+                        // 合并到当前设置（不自动保存）
+                        mergeSettings(importedData, menuUiSettings);
+                        showPromptText("设置已加载，请手动保存");
+                    } catch (error) {
+                        showPromptText("导入失败: 文件格式错误");
+                        console.error("导入设置时出错:", error);
+                    }
+                };
+
+                input.click();
+            };
+
+            // 新增验证方法
+            function validateSettings(settings) {
+                return ["blockedTitle_Switch", "blockedNameOrUid_Switch", "blockedTag_Switch"].some((key) =>
+                    settings.hasOwnProperty(key)
+                );
+            }
+
+            // 新增合并方法（保持响应式）
+            function mergeSettings(source, target) {
+                Object.keys(source).forEach((key) => {
+                    if (Array.isArray(source[key])) {
+                        target[key] = [...source[key]]; // 数组替换
+                    } else if (typeof source[key] === "object") {
+                        Object.assign(target[key], source[key]); // 对象合并
+                    } else {
+                        target[key] = source[key]; // 基本类型
+                    }
+                });
+            }
+
             // 作者主页
             const authorButton = () => {
                 setTimeout(() => {
@@ -884,6 +1073,8 @@ function blockedMenuUi() {
                 refreshButton,
                 saveButton,
                 closeButton,
+                exportButton,
+                importButton,
                 supportButton,
                 authorButton,
             };
@@ -898,6 +1089,9 @@ GM_registerMenuCommand("屏蔽参数面板", blockedMenuUi);
 
 // 视频的详细信息对象，以videoBv为键, 用于同窗口内的缓存查询
 let videoInfoDict = {};
+
+// 视频的UP信息对象，以upUid为键, 用于短时间内的缓存查询
+let videoUpInfoDict = {};
 
 // 上次输出的视频详细信息对象，用于控制台判断是否输出日志
 let lastConsoleVideoInfoDict = {};
@@ -952,19 +1146,100 @@ let lastConsoleVideoInfoDict = {};
 //     },
 // };
 
+// 格式化时间（又造垃圾小轮子……）
+function formatTimestamp({
+    date = true,
+    time = true,
+    milliseconds = false,
+    separator = "-_:.",
+    onlyDate = false,
+    onlyTime = false,
+} = {}) {
+    // 当前时间
+    currentTime = new Date();
+
+    // 时间单位补零
+    const pad = (n, length = 2) => n.toString().padStart(length, "0");
+
+    // 日期
+    const year = currentTime.getFullYear();
+    const month = pad(currentTime.getMonth() + 1);
+    const day = pad(currentTime.getDate());
+    let concatDate = [year, month, day];
+
+    // 时间
+    const hours = pad(currentTime.getHours());
+    const minutes = pad(currentTime.getMinutes());
+    const seconds = pad(currentTime.getSeconds());
+    let concatTime = [hours, minutes, seconds];
+
+    // 毫秒
+    const millis = pad(currentTime.getMilliseconds(), 3);
+
+    let outputTime = "";
+
+    // 只输出日期
+    if (onlyDate) {
+        date = true;
+        time = false;
+    }
+
+    // 只输出时间
+    if (onlyTime) {
+        date = false;
+        time = true;
+    }
+
+    // 有日期 有时间 分隔符没3 2025_04_24_15_22_02
+    if (date === true && time === true && separator.length < 3) {
+        outputTime = concatDate.join(separator[0]) + separator[0] + concatTime.join(separator[0]);
+    }
+
+    // 有日期 有时间 分隔符有3 2025-04-24_15:21:30
+    if (date === true && time === true && separator.length >= 3) {
+        outputTime = concatDate.join(separator[0]) + separator[1] + concatTime.join(separator[2]);
+    }
+
+    // onlyDate 只输出日期
+    if (date === true && time === false) {
+        outputTime = concatDate.join(separator[0]);
+    }
+
+    // onlyTime 只输出时间
+    if (date === false && time === true) {
+        // 分隔符小于3
+        if (separator.length < 3) {
+            outputTime = concatTime.join(separator[0]);
+        } else {
+            outputTime = concatTime.join(separator[2]);
+        }
+    }
+
+    // 加毫秒
+    if (milliseconds) {
+        // 分隔符小于3 2025_04_24_15_22_02_000
+        if (separator.length < 3) {
+            outputTime = outputTime + separator[0] + millis;
+        }
+        // 分隔符等于3 2025-04-24_15:21:30:000
+        else if (separator.length === 3) {
+            outputTime = outputTime + separator[2] + millis;
+        }
+        // 分隔符大于3 2025-04-24_15:21:30.000
+        else {
+            outputTime = outputTime + separator[3] + millis;
+        }
+    }
+
+    return outputTime;
+}
+
 // 日志输出，根据 consoleOutputLog_Switch 标志来决定是否输出日志
 function consoleLogOutput(...args) {
     // 启用控制台日志输出
     if (blockedParameter.consoleOutputLog_Switch) {
-        // 获取当前时间的时分秒毫秒部分
-        let now = new Date();
-        let hours = now.getHours().toString().padStart(2, "0");
-        let minutes = now.getMinutes().toString().padStart(2, "0");
-        let seconds = now.getSeconds().toString().padStart(2, "0");
-        let milliseconds = now.getMilliseconds().toString().padStart(3, "0");
-
         // 将时间信息添加到日志消息中
-        let logTime = `${hours}:${minutes}:${seconds}.${milliseconds}`;
+        let logTime = formatTimestamp({ onlyTime: true, milliseconds: true });
 
         // 合并时间信息和 args 成为一个数组
         let logArray = [logTime, ...args];
@@ -1183,7 +1458,7 @@ function handleBlockedTitle(videoBv) {
 
         if (blockedTitleHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽标题", blockedTitleHitItem);
+            markAsBlockedTarget(videoBv, "按标题屏蔽", blockedTitleHitItem);
         }
     } else {
         // 使用 屏蔽标题数组 与 视频标题 进行匹配
@@ -1197,7 +1472,7 @@ function handleBlockedTitle(videoBv) {
 
         if (blockedTitleHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽标题", blockedTitleHitItem);
+            markAsBlockedTarget(videoBv, "按标题屏蔽", blockedTitleHitItem);
         }
     }
 }
@@ -1275,8 +1550,14 @@ function getVideoApiInfo(videoBv) {
                 100
             ).toFixed(2);
 
-            // // API获取的视频投币数
-            // videoInfoDict[videoBv].videoCoin = videoApiInfoJson.data.stat.coin;
+            // API获取的视频投币数
+            videoInfoDict[videoBv].videoCoin = videoApiInfoJson.data.stat.coin;
+
+            // 计算视频投币率保留2位小数
+            videoInfoDict[videoBv].videoCoinRate = (
+                (videoInfoDict[videoBv].videoCoin / videoInfoDict[videoBv].videoView) *
+                100
+            ).toFixed(2);
 
             // // API获取的视频收藏数
             // videoInfoDict[videoBv].videoFavorite = videoApiInfoJson.data.stat.favorite;
@@ -1315,11 +1596,11 @@ function handleBlockedShortDuration(videoBv) {
     // 判断设置的屏蔽短时长视频值 是否大于 视频时长
     if (blockedParameter.blockedShortDuration > videoInfoDict[videoBv].videoDuration) {
         // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽短时长视频", videoInfoDict[videoBv].videoDuration + "秒");
+        markAsBlockedTarget(videoBv, "屏蔽低时长", videoInfoDict[videoBv].videoDuration + "秒");
     }
 }
 
-// 处理 屏蔽低播放量视频
+// 处理匹配屏蔽低播放量视频
 function handleBlockedBelowVideoViews(videoBv) {
     // 判断是否拿到视频播放量
     if (!videoInfoDict[videoBv].videoView) {
@@ -1347,10 +1628,24 @@ function handleBlockedBelowLikesRate(videoBv) {
     }
 }
 
+// 处理匹配屏蔽低于指定投币率的视频
+function handleBlockedBelowCoinRate(videoBv) {
+    // 判断是否拿到视频点赞数
+    if (!videoInfoDict[videoBv].videoCoinRate) {
+        return;
+    }
+
+    // 判断设置的屏蔽视频投币率值 是否大于 视频的投币率
+    if (blockedParameter.blockedBelowCoinRate > videoInfoDict[videoBv].videoCoinRate) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低投币率", videoInfoDict[videoBv].videoCoinRate + "%");
+    }
+}
+
 // 处理匹配屏蔽竖屏视频
 function handleBlockedPortraitVideo(videoBv) {
     // 判断是否拿到视频分辨率
-    if (!videoInfoDict[videoBv].videoResolution.width) {
+    if (!videoInfoDict[videoBv].videoResolution?.width) {
         return;
     }
 
@@ -1370,7 +1665,7 @@ function handleBlockedChargingExclusive(videoBv) {
     // 判断设置的屏蔽充电专属视频是否有启用标记
     if (videoInfoDict[videoBv].videoChargingExclusive) {
         // 标记为屏蔽目标并记录触发的规则
-        markAsBlockedTarget(videoBv, "屏蔽充电专属的视频", videoInfoDict[videoBv].videoUpName);
+        markAsBlockedTarget(videoBv, "屏蔽充电专属视频", videoInfoDict[videoBv].videoUpName);
     }
 }
 
@@ -1405,7 +1700,7 @@ function handleBlockedNameOrUid(videoBv) {
 
         if (blockedNameOrUidHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽UP", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按UP名称或Uid屏蔽", blockedRulesItemText);
         }
     } else {
         // 使用 屏蔽Up名称和Uid数组 与 视频Up主Uid 和 视频Up主名称 进行匹配
@@ -1423,7 +1718,7 @@ function handleBlockedNameOrUid(videoBv) {
 
         if (blockedNameOrUidHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽UP", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按UP名称或Uid屏蔽", blockedRulesItemText);
         }
     }
 }
@@ -1443,7 +1738,7 @@ function handleBlockedVideoPartitions(videoBv) {
         // 使用 屏蔽视频分区数组 与 视频分区 进行匹配
         const blockedVideoPartitionsHitItem = blockedParameter.blockedVideoPartitions_Array.find(
             (blockedVideoPartitionsItem) => {
-                // 正则化屏蔽视频标签
+                // 正则化屏蔽视频分区
                 const blockedVideoPartitionsRegEx = new RegExp(blockedVideoPartitionsItem);
 
                 if (blockedVideoPartitionsRegEx.test(videoInfoDict[videoBv].videoPartitions)) {
@@ -1455,7 +1750,7 @@ function handleBlockedVideoPartitions(videoBv) {
 
         if (blockedVideoPartitionsHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽分区", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按视频分区屏蔽", blockedRulesItemText);
         }
     } else {
         // 使用 屏蔽视频分区数组 与 视频分区 进行匹配
@@ -1470,7 +1765,167 @@ function handleBlockedVideoPartitions(videoBv) {
 
         if (blockedVideoPartitionsHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽分区", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按视频分区屏蔽", blockedRulesItemText);
+        }
+    }
+}
+
+// API获取视频UP主信息
+function getVideoApiUpInfo(videoBv) {
+    // // 如果已经有BV号对应的记录，跳过
+    // if (videoInfoDict[videoBv].videoDuration) {
+    //     return;
+    // }
+
+    // 没有拿到UP主的Uid，跳过
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    const upUid = videoInfoDict[videoBv].videoUpUid;
+
+    const currentTime = new Date(); //获取当前时间
+
+    // 已经拿到过UP主等级的，并且距离上次的更新时间，小于4小时的，跳过
+    if (videoUpInfoDict[upUid]?.upLevel && currentTime - videoUpInfoDict[upUid]?.updateTime < 3600000) {
+        // API获取的UP主等级:
+        videoInfoDict[videoBv].videoUpLevel = videoUpInfoDict[upUid].upLevel;
+
+        // API获取的UP主粉丝数:
+        videoInfoDict[videoBv].videoUpFans = videoUpInfoDict[upUid].upFans;
+
+        // API获取的UP主简介:
+        videoInfoDict[videoBv].videoUpSign = videoUpInfoDict[upUid].upSign;
+        return;
+    }
+
+    // 当 lastVideoUpInfoApiRequestTime 上次API获取UP主信息的时间存在，并且，和当前的时间差小于3秒时，跳过
+    if (
+        videoInfoDict[videoBv]?.lastVideoUpInfoApiRequestTime &&
+        currentTime - videoInfoDict[videoBv]?.lastVideoUpInfoApiRequestTime < 3000
+    ) {
+        // consoleLogOutput(videoBv, "getVideoApiUpInfo() 距离上次 Fetch 获取UP主信息还未超过3秒钟");
+        return;
+    }
+    videoInfoDict[videoBv].lastVideoUpInfoApiRequestTime = currentTime;
+
+    // 确保 videoUpInfoDict[upUid] 已定义
+    if (!videoUpInfoDict[upUid]) {
+        videoUpInfoDict[upUid] = {};
+    }
+
+    // 通过API获取UP信息
+    fetch(`https://api.bilibili.com/x/web-interface/card?mid=${upUid}`)
+        .then((response) => response.json())
+        .then((videoApiUpInfoJson) => {
+            // API获取的UP主名称:
+            videoUpInfoDict[upUid].upName = videoApiUpInfoJson.data.card.name;
+
+            // API获取的UP主等级:
+            videoUpInfoDict[upUid].upLevel = videoApiUpInfoJson.data.card.level_info.current_level;
+            videoInfoDict[videoBv].videoUpLevel = videoApiUpInfoJson.data.card.level_info.current_level;
+
+            // API获取的UP主粉丝数:
+            videoUpInfoDict[upUid].upFans = videoApiUpInfoJson.data.card.fans;
+            videoInfoDict[videoBv].videoUpFans = videoApiUpInfoJson.data.card.fans;
+
+            // API获取的UP主简介:
+            videoUpInfoDict[upUid].upSign = videoApiUpInfoJson.data.card.sign;
+            videoInfoDict[videoBv].videoUpSign = videoApiUpInfoJson.data.card.sign;
+
+            // API获取的UP主信息的时间:
+            const currentTime = new Date(); //获取当前时间
+            videoUpInfoDict[upUid].updateTime = currentTime;
+
+            FuckYouBilibiliRecommendationSystem();
+        })
+        .catch((error) => consoleLogOutput(videoBv, "getVideoApiUpInfo() Fetch错误:", error));
+}
+
+// 处理匹配的低于指定UP主等级的视频
+function handleBlockedBelowUpLevel(videoBv) {
+    // 没有拿到UP主的Uid，跳过
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    const upUid = videoInfoDict[videoBv].videoUpUid;
+
+    // 没有拿到UP主等级，跳过
+    if (!videoUpInfoDict[upUid]?.upLevel) {
+        return;
+    }
+
+    // 判断设置的屏蔽UP主等级 是否大于 视频的UP主等级
+    if (blockedParameter.blockedBelowUpLevel > videoUpInfoDict[upUid].upLevel) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低UP主等级", videoUpInfoDict[upUid].upLevel + "级");
+    }
+}
+
+// 处理匹配的低于指定UP主粉丝数的视频
+function handleBlockedBelowUpFans(videoBv) {
+    // 没有拿到UP主的Uid，跳过
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    const upUid = videoInfoDict[videoBv].videoUpUid;
+
+    // 没有拿到UP主粉丝数，跳过
+    if (!videoUpInfoDict[upUid].upFans) {
+        return;
+    }
+
+    // 判断设置的屏蔽UP主粉丝数 是否大于 视频的UP主粉丝数
+    if (blockedParameter.blockedBelowUpFans > videoUpInfoDict[upUid].upFans) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽低UP主粉丝数", videoUpInfoDict[upUid].upFans + "人");
+    }
+}
+
+// 处理匹配的包含相关UP主简介的视频
+function handleBlockedUpSigns(videoBv) {
+    // 没有拿到UP主的Uid，跳过
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    const upUid = videoInfoDict[videoBv].videoUpUid;
+
+    // 没有拿到UP主简介，跳过
+    if (!videoUpInfoDict[upUid].upSign) {
+        return;
+    }
+
+    // 是否启用正则
+    if (blockedParameter.blockedUpSigns_UseRegular) {
+        // 使用 屏蔽UP主简介数组 与 视频UP主简介 进行匹配
+        const blockedUpSignsHitItem = blockedParameter.blockedUpSigns_Array.find((blockedUpSignsItem) => {
+            // 正则化屏蔽UP主简介
+            const blockedUpSignsRegEx = new RegExp(blockedUpSignsItem);
+            // 判断 正则化的屏蔽UP主简介 是否匹配 视频UP主简介
+            if (blockedUpSignsRegEx.test(videoUpInfoDict[upUid].upSign)) {
+                return true;
+            }
+        });
+
+        if (blockedUpSignsHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "按UP主简介屏蔽", blockedUpSignsHitItem);
+        }
+    } else {
+        // 使用 屏蔽UP主简介 与 视频UP主简介 进行匹配
+        const blockedUpSignsHitItem = blockedParameter.blockedUpSigns_Array.find((blockedUpSignsItem) => {
+            // 判断 屏蔽UP主简介 是否匹配 视频UP主简介
+            if (blockedUpSignsItem === videoUpInfoDict[upUid].upSign) {
+                return true;
+            }
+        });
+
+        if (blockedUpSignsHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            markAsBlockedTarget(videoBv, "按UP主简介屏蔽", blockedUpSignsHitItem);
         }
     }
 }
@@ -1534,7 +1989,7 @@ function handleBlockedTag(videoBv) {
 
         if (blockedTagHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽标签", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按标签屏蔽", blockedRulesItemText);
         }
     } else {
         // 使用 屏蔽标签数组 与 视频标题数组 进行匹配
@@ -1552,7 +2007,7 @@ function handleBlockedTag(videoBv) {
 
         if (blockedTagHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽标签", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按标签屏蔽", blockedRulesItemText);
         }
     }
 }
@@ -1591,7 +2046,7 @@ function handleDoubleBlockedTag(videoBv) {
 
         if (doubleBlockedTagHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽双重标签", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按双重标签屏蔽", blockedRulesItemText);
         }
     } else {
         // 使用 双重屏蔽标签数组 与 视频标签 进行匹配
@@ -1614,7 +2069,7 @@ function handleDoubleBlockedTag(videoBv) {
 
         if (doubleBlockedTagHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽双重标签", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按双重标签屏蔽", blockedRulesItemText);
         }
     }
 }
@@ -1741,7 +2196,7 @@ function handleBlockedTopComment(videoBv) {
 
         if (blockedTopCommentHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽置顶评论", blockedTopCommentHitItem);
+            markAsBlockedTarget(videoBv, "按置顶评论屏蔽", blockedTopCommentHitItem);
         }
     } else {
         // 使用 屏蔽置顶评论数组 与 置顶评论 进行匹配
@@ -1754,7 +2209,7 @@ function handleBlockedTopComment(videoBv) {
 
         if (blockedTopCommentHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "屏蔽置顶评论", blockedTopCommentHitItem);
+            markAsBlockedTarget(videoBv, "按置顶评论屏蔽", blockedTopCommentHitItem);
         }
     }
 }
@@ -1819,7 +2274,7 @@ function hideNonVideoElements() {
 
     // 隐藏视频播放页右侧广告、视频相关的游戏推荐、视频相关的特殊推荐、大家围观的直播
     const adElements_4 = document.querySelectorAll(
-        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.pop-live-small-mode"
+        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.video-page-operator-card-small, div.pop-live-small-mode, div.ad-report, div.activity-m-v1, div.video-card-ad-small"
     );
     adElements_4.forEach(function (element) {
         element.style.display = "none";
@@ -2037,7 +2492,7 @@ function FuckYouBilibiliRecommendationSystem() {
         // 网页获取视频Up名和UpUid
         getNameAndUid(videoElement, videoBv);
 
-        // 通过API获取视频信息
+        // 通过API获取视频信息（UP名、UID、AV号、时长、分区、播放数、点选数、投币数、充电专属、分辨率）
         getVideoApiInfo(videoBv);
 
         // 是否启用 屏蔽Up主名称或Up主Uid
@@ -2073,6 +2528,12 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedBelowLikesRate(videoBv);
         }
 
+        // 是否启用 屏蔽低于指定投币率的视频
+        if (blockedParameter.blockedBelowCoinRate_Switch && blockedParameter.blockedBelowCoinRate > 0) {
+            // 判断处理 屏蔽低于指定投币率的视频
+            handleBlockedBelowCoinRate(videoBv);
+        }
+
         // 是否启用 屏蔽竖屏视频
         if (blockedParameter.blockedPortraitVideo_Switch) {
             // 判断处理 屏蔽竖屏视频
@@ -2083,6 +2544,27 @@ function FuckYouBilibiliRecommendationSystem() {
         if (blockedParameter.blockedChargingExclusive_Switch) {
             // 判断处理 蔽充电专属视频
             handleBlockedChargingExclusive(videoBv);
+        }
+
+        // API获取视频UP主信息
+        getVideoApiUpInfo(videoBv);
+
+        // 是否启用 屏蔽低于指定UP主等级的视频
+        if (blockedParameter.blockedBelowUpLevel_Switch && blockedParameter.blockedBelowUpLevel > 0) {
+            // 判断处理匹配的低于指定UP主等级的视频
+            handleBlockedBelowUpLevel(videoBv);
+        }
+
+        // 是否启用 屏蔽低于指定UP主粉丝数的视频
+        if (blockedParameter.blockedBelowUpFans_Switch && blockedParameter.blockedBelowUpFans > 0) {
+            // 判断处理匹配的低于指定UP主粉丝数的视频
+            handleBlockedBelowUpFans(videoBv);
+        }
+
+        // 是否启用 屏蔽包含相关UP主简介的视频
+        if (blockedParameter.blockedUpSigns_Switch && blockedParameter.blockedUpSigns_Array.length > 0) {
+            // 判断处理匹配的包含相关UP主简介的视频
+            handleBlockedUpSigns(videoBv);
         }
 
         // 通过API获取视频标签
