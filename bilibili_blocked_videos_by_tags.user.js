@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.2.0
+// @version         1.3.0
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
@@ -10,6 +10,12 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.3.0 添加新功能：“屏蔽高于此收藏/投币比的视频”，感谢 [xmlhttp](https://greasyfork.org/zh-CN/users/68271-xmlhttp) 的建议。
+// @note                   为了保护新发的视频，只会处理播放数5000+、收藏数50+、发布时间2小时+的视频。
+// @note                   添加理由：收藏数量远大于投币的视频，大概是刷的数据，我个人投稿视频的收藏/投币比例，几乎没有高于3的，刷了半天视频，决定该默认值定为10。
+// @note                            [xmlhttp 的评论](https://greasyfork.org/zh-CN/scripts/481629/discussions/296729)、
+// @note                            [【有亦探索】揭密点赞投币收藏重要性顺序——林亦LYi](https://www.bilibili.com/video/BV1st411Y73m)、
+// @note                            [「收藏」正在摧毁B站——码农高天](https://www.bilibili.com/video/BV1Cz42187ju)
 // @note            v1.2.0 添加新功能：“屏蔽低于指定投币率的视频”，有人觉得有用……但是实际真用处不大，太多人不投币了，1%都能干掉8成视频。
 // @note                   添加新功能：“屏蔽低于指定UP主等级的视频”、“屏蔽低于指定UP主粉丝数的视频”、“按UP主简介屏蔽” 就是增加了UP相关信息的屏蔽，感谢 爱发电用户5f0c2 的赞助需求！
 // @note                   添加新功能：“导出设置”、“导入设置”，其实就是个JSON……
@@ -111,6 +117,10 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     // 屏蔽低于指定投币率的视频
     blockedBelowCoinRate_Switch: false,
     blockedBelowCoinRate: 0,
+
+    // 屏蔽高于指定收藏投币比的视频
+    blockedAboveFavoriteCoinRatio_Switch: false,
+    blockedAboveFavoriteCoinRatio: 10,
 
     // 屏蔽竖屏视频
     blockedPortraitVideo_Switch: false,
@@ -485,11 +495,13 @@ GM_addStyle(`
 
 /* 支付宝微信二维码 */
 #alipayWeChatQrCode {
+    color: white;
+    background-color: black;
+    padding: 10px;
     position: fixed;
     top: 52%;
     left: 16%;
     transform: translate(0%, -50%);
-    box-shadow: 0 8px 8px rgb(85 85 85 / 85%);
 }
 
 /* 修正隐藏元素后导致的对齐问题 */
@@ -604,26 +616,23 @@ let menuUiHTML = `
         </div>
 
 
+        <div class="menuOptions">
+            <label title="视频API，是拿到视频的充电视频标记后判断的"><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频(?)</label>
+        </div>
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="视频API，现在视频的分区可能不是很好确定名字，可以看日志来判断"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽(?)</label>
+                <label title="视频API，是拿到视频的收藏数和投币数后计算出比例后判断的，
+简单来说，它可以一定程度上判断这个视频是不是刷数据的低质视频。
+高质量的原创视频，收藏/投币的比，一般都不会高于5，
+小于1反而是常态，高于10的有高概率是刷数据的视频。
+具体的原理，请查看 v1.3.0 更新日志中的三个链接。
+(只会处理播放数5000+、收藏数50+、发布时间2小时+的视频)
+！！！对教程类视频可能会有严重误伤！！！"><input type="checkbox"
+                        v-model="menuUiSettings.blockedAboveFavoriteCoinRatio_Switch" />屏蔽高于此收藏/投币比的视频(?)</label>
             </div>
-
-            <div class="titleLabelRight">
-                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则(?)</label>
-            </div>
-
-            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
-                v-model="tempInputValue.blockedVideoPartitions_Array" /><button
-                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
-
-            <ul>
-                <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
-                    {{value}}<button
-                        @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
-                </li>
-            </ul>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedAboveFavoriteCoinRatio" />
+            <label></label>
         </div>
 
         <div class="menuOptions">
@@ -649,7 +658,8 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="视频API，是拿到视频的播放量和点赞数后判断的"><input type="checkbox"
+                <label title="视频API，是拿到视频的播放量和点赞数后判断的
+意义不大，推荐使用 收藏/投币比 屏蔽"><input type="checkbox"
                         v-model="menuUiSettings.blockedBelowLikesRate_Switch" />屏蔽低于此点赞率的视频(?)</label>
             </div>
             <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowLikesRate" />
@@ -658,7 +668,8 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="视频API，是拿到视频的播放量和投币数后判断的，实用性不高"><input type="checkbox"
+                <label title="视频API，是拿到视频的播放量和投币数后判断的
+意义不大，推荐使用 收藏/投币比 屏蔽"><input type="checkbox"
                         v-model="menuUiSettings.blockedBelowCoinRate_Switch" />屏蔽低于此投币率的视频(?)</label>
             </div>
             <input type="number" spellcheck="false" v-model="menuUiSettings.blockedBelowCoinRate" />
@@ -666,7 +677,24 @@ let menuUiHTML = `
         </div>
 
         <div class="menuOptions">
-            <label title="视频API，是拿到视频的充电视频标记后判断的"><input type="checkbox" v-model="menuUiSettings.blockedChargingExclusive_Switch" />屏蔽充电专属的视频(?)</label>
+            <div class="titleLabelLeft">
+                <label title="视频API，现在视频的分区可能不是很好确定名字，可以看日志来判断"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽(?)</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_UseRegular" />启用正则(?)</label>
+            </div>
+
+            <input type="text" placeholder="多项输入请用英文逗号间隔" spellcheck="false"
+                v-model="tempInputValue.blockedVideoPartitions_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedVideoPartitions_Array')">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
+                    {{value}}<button
+                        @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
+                </li>
+            </ul>
         </div>
 
 
@@ -711,6 +739,11 @@ let menuUiHTML = `
 
 
         <div class="menuOptions">
+            <label title="评论API，极易请求过多导致拒绝"><input type="checkbox"
+                    v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频(?)</label>
+        </div>
+
+        <div class="menuOptions">
             <div class="titleLabelLeft">
                 <label title="评论API，极易请求过多导致拒绝"><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽(?)</label>
             </div>
@@ -730,12 +763,7 @@ let menuUiHTML = `
             </ul>
         </div>
 
-        <div class="menuOptions">
-            <label title="评论API，极易请求过多导致拒绝"><input type="checkbox"
-                    v-model="menuUiSettings.blockedFilteredCommentsVideo_Switch" />屏蔽精选评论的视频(?)</label>
-        </div>
 
-        
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
@@ -785,7 +813,7 @@ let menuUiHTML = `
         <button @click="supportButton()">赞助</button>
 
     <div id="alipayWeChatQrCode" v-show="tempInputValue.QrCode_Switch">
-        <img src="https://tc.dhmip.cn/imgs/2023/12/09/a8e5fff3320dc195.png" alt="感谢赞助">
+        <label>感谢赞助，二维码暂停使用，即将跳转到爱发电</label>
     </div>
 
     <!-- 添加提示框 -->
@@ -1532,6 +1560,9 @@ function getVideoApiInfo(videoBv) {
             // API获取的视频AVid:
             videoInfoDict[videoBv].videoAVid = videoApiInfoJson.data.aid;
 
+            // API获取的视频发布时间:
+            videoInfoDict[videoBv].videoPubdate = videoApiInfoJson.data.pubdate;
+
             // API获取的视频时长
             videoInfoDict[videoBv].videoDuration = videoApiInfoJson.data.duration;
 
@@ -1559,8 +1590,13 @@ function getVideoApiInfo(videoBv) {
                 100
             ).toFixed(2);
 
-            // // API获取的视频收藏数
-            // videoInfoDict[videoBv].videoFavorite = videoApiInfoJson.data.stat.favorite;
+            // API获取的视频收藏数
+            videoInfoDict[videoBv].videoFavorite = videoApiInfoJson.data.stat.favorite;
+
+            // 计算视频的收藏数/投币数比例
+            videoInfoDict[videoBv].videoFavoriteCoinRatio = (
+                videoInfoDict[videoBv].videoFavorite / videoInfoDict[videoBv].videoCoin
+            ).toFixed(2);
 
             // // API获取的视频分享数
             // videoInfoDict[videoBv].videoShare = videoApiInfoJson.data.stat.share;
@@ -1630,7 +1666,7 @@ function handleBlockedBelowLikesRate(videoBv) {
 
 // 处理匹配屏蔽低于指定投币率的视频
 function handleBlockedBelowCoinRate(videoBv) {
-    // 判断是否拿到视频点赞数
+    // 判断是否拿到视频投币数
     if (!videoInfoDict[videoBv].videoCoinRate) {
         return;
     }
@@ -1639,6 +1675,42 @@ function handleBlockedBelowCoinRate(videoBv) {
     if (blockedParameter.blockedBelowCoinRate > videoInfoDict[videoBv].videoCoinRate) {
         // 标记为屏蔽目标并记录触发的规则
         markAsBlockedTarget(videoBv, "屏蔽低投币率", videoInfoDict[videoBv].videoCoinRate + "%");
+    }
+}
+
+// 处理匹配屏蔽高于指定的收藏/投币比的视频
+function handleBlockedAboveFavoriteCoinRatio(videoBv) {
+    // 判断视频的播放数是否小于5000，小于5000的话跳过
+    if (videoInfoDict[videoBv].videoView < 5000) {
+        return;
+    }
+
+    // 判断视频的收藏数是否小于50，小于50的话跳过
+    if (videoInfoDict[videoBv].videoFavorite < 50) {
+        return;
+    }
+
+    // 获取当前时间戳
+    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+
+    // 判断视频的发布时间是否小于2小时，小于2小时的话跳过
+    if (currentTimeInSeconds - videoInfoDict[videoBv].videoPubdate < 7200) {
+        return;
+    }
+
+    // 判断是否拿到视频的收藏投币比
+    if (!videoInfoDict[videoBv].videoFavoriteCoinRatio) {
+        return;
+    }
+
+    // 判断 视频的收藏投币比 是否大于 设置的屏蔽视频收藏投币比值
+    if (videoInfoDict[videoBv].videoFavoriteCoinRatio > blockedParameter.blockedAboveFavoriteCoinRatio) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(
+            videoBv,
+            "屏蔽高收藏投币比",
+            videoInfoDict[videoBv].videoFavoriteCoinRatio + "\nUP主: " + videoInfoDict[videoBv].videoUpName
+        );
     }
 }
 
@@ -1700,7 +1772,7 @@ function handleBlockedNameOrUid(videoBv) {
 
         if (blockedNameOrUidHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "按UP名称或Uid屏蔽", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按UP主屏蔽", blockedRulesItemText);
         }
     } else {
         // 使用 屏蔽Up名称和Uid数组 与 视频Up主Uid 和 视频Up主名称 进行匹配
@@ -1718,7 +1790,7 @@ function handleBlockedNameOrUid(videoBv) {
 
         if (blockedNameOrUidHitItem) {
             // 标记为屏蔽目标并记录触发的规则
-            markAsBlockedTarget(videoBv, "按UP名称或Uid屏蔽", blockedRulesItemText);
+            markAsBlockedTarget(videoBv, "按UP主屏蔽", blockedRulesItemText);
         }
     }
 }
@@ -2257,6 +2329,16 @@ function hideNonVideoElements() {
             element.parentNode.style.display = "none";
             element.style.display = "none";
         });
+
+        // 隐藏 搜索页——综合 下的 课堂卡片
+        const adElements_cheese = document.querySelectorAll(
+            'div.bili-video-card:has(a[href^="https://www.bilibili.com/cheese/"])'
+        );
+        adElements_cheese.forEach(function (element) {
+            if (element.parentNode) {
+                element.parentNode.style.display = "none";
+            }
+        });
     }
 
     // 隐藏首页广告，那些没有“enable-no-interest” CSS类的视频卡片元素
@@ -2501,13 +2583,25 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedNameOrUid(videoBv);
         }
 
-        // 是否启用 屏蔽视频分区
+        // 是否启用 屏蔽充电专属视频
+        if (blockedParameter.blockedChargingExclusive_Switch) {
+            // 判断处理 蔽充电专属视频
+            handleBlockedChargingExclusive(videoBv);
+        }
+
+        // 是否启用 屏蔽高于指定收藏/投币比的视频
         if (
-            blockedParameter.blockedVideoPartitions_Switch &&
-            blockedParameter.blockedVideoPartitions_Array.length > 0
+            blockedParameter.blockedAboveFavoriteCoinRatio_Switch &&
+            blockedParameter.blockedAboveFavoriteCoinRatio > 0
         ) {
-            // 判断处理匹配 屏蔽视频分区
-            handleBlockedVideoPartitions(videoBv);
+            // 判断处理 屏蔽高于指定收藏/投币比的视频
+            handleBlockedAboveFavoriteCoinRatio(videoBv);
+        }
+
+        // 是否启用 屏蔽竖屏视频
+        if (blockedParameter.blockedPortraitVideo_Switch) {
+            // 判断处理 屏蔽竖屏视频
+            handleBlockedPortraitVideo(videoBv);
         }
 
         // 是否启用 屏蔽短时长视频
@@ -2534,16 +2628,13 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedBelowCoinRate(videoBv);
         }
 
-        // 是否启用 屏蔽竖屏视频
-        if (blockedParameter.blockedPortraitVideo_Switch) {
-            // 判断处理 屏蔽竖屏视频
-            handleBlockedPortraitVideo(videoBv);
-        }
-
-        // 是否启用 屏蔽充电专属视频
-        if (blockedParameter.blockedChargingExclusive_Switch) {
-            // 判断处理 蔽充电专属视频
-            handleBlockedChargingExclusive(videoBv);
+        // 是否启用 屏蔽视频分区
+        if (
+            blockedParameter.blockedVideoPartitions_Switch &&
+            blockedParameter.blockedVideoPartitions_Array.length > 0
+        ) {
+            // 判断处理匹配 屏蔽视频分区
+            handleBlockedVideoPartitions(videoBv);
         }
 
         // API获取视频UP主信息
