@@ -2658,8 +2658,11 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedUpSigns(videoBv);
         }
 
-        // 通过API获取视频标签
-        getVideoApiTags(videoBv);
+        // 是否需要 API获取视频标签
+        if ((blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) || (blockedParameter.doubleBlockedTag_Switch && blockedParameter.doubleBlockedTag_Array.length > 0)) {
+            // 判断请求 API获取视频标签
+            getVideoApiTags(videoBv);
+        }
 
         // 是否启用 屏蔽标签
         if (blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) {
