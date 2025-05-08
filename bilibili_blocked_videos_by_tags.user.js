@@ -2673,8 +2673,11 @@ function FuckYouBilibiliRecommendationSystem() {
             handleDoubleBlockedTag(videoBv);
         }
 
-        // API获取视频评论区
-        getVideoApiComments(videoBv);
+        // 是否需要 API获取视频评论区
+        if (blockedParameter.blockedFilteredCommentsVideo_Switch || (blockedParameter.blockedTopComment_Switch && blockedParameter.blockedTopComment_Array.length > 0)) {
+            // 判断请求 API获取视频评论区
+            getVideoApiComments(videoBv);
+        }
 
         // 是否启用 屏蔽精选评论的视频
         if (blockedParameter.blockedFilteredCommentsVideo_Switch) {
