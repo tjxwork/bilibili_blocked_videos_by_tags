@@ -2637,8 +2637,11 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedVideoPartitions(videoBv);
         }
 
-        // API获取视频UP主信息
-        getVideoApiUpInfo(videoBv);
+        // 是否需要 API获取视频UP主信息
+        if ((blockedParameter.blockedBelowUpLevel_Switch && blockedParameter.blockedBelowUpLevel > 0) || (blockedParameter.blockedBelowUpFans_Switch && blockedParameter.blockedBelowUpFans > 0) || (blockedParameter.blockedUpSigns_Switch && blockedParameter.blockedUpSigns_Array.length > 0)) {
+            // 判断请求 API获取视频UP主信息
+            getVideoApiUpInfo(videoBv);
+        }
 
         // 是否启用 屏蔽低于指定UP主等级的视频
         if (blockedParameter.blockedBelowUpLevel_Switch && blockedParameter.blockedBelowUpLevel > 0) {
@@ -2658,8 +2661,11 @@ function FuckYouBilibiliRecommendationSystem() {
             handleBlockedUpSigns(videoBv);
         }
 
-        // 通过API获取视频标签
-        getVideoApiTags(videoBv);
+        // 是否需要 API获取视频标签
+        if ((blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) || (blockedParameter.doubleBlockedTag_Switch && blockedParameter.doubleBlockedTag_Array.length > 0)) {
+            // 判断请求 API获取视频标签
+            getVideoApiTags(videoBv);
+        }
 
         // 是否启用 屏蔽标签
         if (blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) {
@@ -2673,8 +2679,11 @@ function FuckYouBilibiliRecommendationSystem() {
             handleDoubleBlockedTag(videoBv);
         }
 
-        // API获取视频评论区
-        getVideoApiComments(videoBv);
+        // 是否需要 API获取视频评论区
+        if (blockedParameter.blockedFilteredCommentsVideo_Switch || (blockedParameter.blockedTopComment_Switch && blockedParameter.blockedTopComment_Array.length > 0)) {
+            // 判断请求 API获取视频评论区
+            getVideoApiComments(videoBv);
+        }
 
         // 是否启用 屏蔽精选评论的视频
         if (blockedParameter.blockedFilteredCommentsVideo_Switch) {
