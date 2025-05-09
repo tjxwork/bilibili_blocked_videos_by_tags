@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.3.0
+// @version         1.3.1
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
@@ -10,6 +10,8 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。
+// @note                   感谢 [xiaofeiTM233](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/16) 的补充提交。
 // @note            v1.3.0 添加新功能：“屏蔽高于此收藏/投币比的视频”，感谢 [xmlhttp](https://greasyfork.org/zh-CN/users/68271-xmlhttp) 的建议。
 // @note                   为了保护新发的视频，只会处理播放数5000+、收藏数50+、发布时间2小时+的视频。
 // @note                   添加理由：收藏数量远大于投币的视频，大概是刷的数据，我个人投稿视频的收藏/投币比例，几乎没有高于3的，刷了半天视频，决定该默认值定为10。
