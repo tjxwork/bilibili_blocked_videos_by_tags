@@ -69,6 +69,8 @@
 // @grant           GM_getValue
 // @grant           GM_addStyle
 // @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
+// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
+// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
