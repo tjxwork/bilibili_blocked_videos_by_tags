@@ -44,7 +44,7 @@
 // @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
 // @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
 // @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
-// @description     对Bilibili的视频卡片，以标签、标题、UP主、时长、竖屏、充电、评论等信息来屏蔽视频，附带去除视频卡片中的直播、广告、推广内容的功能。
+// @description     对 Bilibili.com 的视频卡片元素，以标题、UP 主、标签、双重标签、充电专属、收藏投币比、竖屏、时长、播放量、点赞率、视频分区、UP 主等级、UP 主粉丝数、UP 主简介、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频，附带去除广告等非视频元素的功能。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
@@ -531,7 +531,7 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.2.0</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.3.1</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
@@ -1463,8 +1463,35 @@ function getBvAndTitle(videoElement) {
     return videoBv;
 }
 
+/**
+ * 重建字典
+ * @param blockedType 
+ * @param array 
+ * @param videoBv 
+ */
+function restructureDicts(blockedType, array, videoBv) {
+    const videoElements = getVideoElements();
+    let rules = videoInfoDict[videoBv].triggeredBlockedRules;
+    rules?.forEach((val, index) => {
+        if (val.indexOf(blockedType) === 0) {
+            const text = val.split(`${blockedType}: `)[1];
+            if (!array.includes(text)) {
+                rules.splice(index, 1);
+                videoInfoDict[videoBv].blockedTarget = false
+                for (let videoElement of videoElements) {
+                    let _videoBv = getBvAndTitle(videoElement);
+                    if (_videoBv === videoBv) {
+                        removeHiddenOrOverlay(videoElement);
+                    }
+                }
+            }
+        }
+    });
+}
+
 // 处理匹配的屏蔽标题
 function handleBlockedTitle(videoBv) {
+    restructureDicts('按标题屏蔽', blockedParameter.blockedTitle_Array, videoBv);
     // 判断是否拿到视频标题
     if (!videoInfoDict[videoBv].videoTitle) {
         return;
@@ -2457,14 +2484,14 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
             }
 
             // 获取 videoElement 的尺寸
-            const elementRect = videoElement.getBoundingClientRect();
+            //const elementRect = videoElement.getBoundingClientRect();
 
             // 叠加层参数(背景)
             let overlay = document.createElement("div");
             overlay.className = "blockedOverlay";
             overlay.style.position = "absolute";
-            overlay.style.width = elementRect.width + "px"; // 使用 videoElement 的宽度
-            overlay.style.height = elementRect.height + "px"; // 使用 videoElement 的高度
+            overlay.style.width = "100%";
+            overlay.style.height = "100%";
             overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
             overlay.style.display = "flex";
             overlay.style.justifyContent = "center";
@@ -2488,33 +2515,33 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
         }
     }
 
-    // 去除隐藏或叠加层
-    function removeHiddenOrOverlay(videoElement) {
-        // 是否为隐藏视频模式？
-        if (blockedParameter.hideVideoMode_Switch == true) {
-            // 取消隐藏
 
-            // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面
-            if (window.location.href.startsWith("https://search.bilibili.com/")) {
-                videoElement.parentNode.style.display = "";
-                videoElement.style.display = "";
-            }
-            // 如果是父元素是feed-card
-            else if (videoElement.closest("div.feed-card") !== null) {
-                videoElement.closest("div.feed-card").style.display = "";
-                videoElement.style.display = "";
-            } else {
-                videoElement.style.display = "";
-            }
+}
+// 去除隐藏或叠加层
+function removeHiddenOrOverlay(videoElement) {
+    // 是否为隐藏视频模式？
+    if (blockedParameter.hideVideoMode_Switch == true) {
+        // 取消隐藏
+
+        // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面
+        if (window.location.href.startsWith("https://search.bilibili.com/")) {
+            videoElement.parentNode.style.display = "";
+            videoElement.style.display = "";
+        }
+        // 如果是父元素是feed-card
+        else if (videoElement.closest("div.feed-card") !== null) {
+            videoElement.closest("div.feed-card").style.display = "";
+            videoElement.style.display = "";
         } else {
-            // 删除叠加层
-            if (videoElement.firstElementChild.className == "blockedOverlay") {
-                videoElement.removeChild(videoElement.firstElementChild);
-            }
+            videoElement.style.display = "";
+        }
+    } else {
+        // 删除叠加层
+        if (videoElement.firstElementChild.className == "blockedOverlay") {
+            videoElement.removeChild(videoElement.firstElementChild);
         }
     }
 }
-
 // 同步屏蔽叠加层与父元素的尺寸
 function syncBlockedOverlayAndParentNodeRect() {
     // 获取所有的屏蔽叠加层
@@ -2709,7 +2736,7 @@ function FuckYouBilibiliRecommendationSystem() {
         blockedOrUnblocked(videoElement, videoBv);
 
         // 同步屏蔽叠加层与父元素的尺寸
-        syncBlockedOverlayAndParentNodeRect();
+        //syncBlockedOverlayAndParentNodeRect();
     }
 }
 
