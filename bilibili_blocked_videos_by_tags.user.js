@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.0
+// @version         1.4.1
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
@@ -12,6 +12,7 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
 // @note            v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。
 // @note                   旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。
 // @note            v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。
@@ -68,6 +69,9 @@
 // @exclude         https://www.bilibili.com/v/popular/drama/*
 // @match           https://search.bilibili.com/*
 // @exclude         https://search.bilibili.com/live
+// @match           https://t.bilibili.com/*
+// @match           https://message.bilibili.com/*
+// @match           https://space.bilibili.com/*
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
@@ -809,8 +813,8 @@ let menuUiHTML = `
         </div>
 
         <div class="menuOptions">
-            <label title="不用自己重新填了，直接按你有的标题标签屏蔽项来屏蔽热搜项"><input type="checkbox"
-                    v-model="menuUiSettings.blockedTrendingItemByTitleTag_Switch" />按已有的标题、标签项屏蔽热搜项(?)</label>
+            <label title="不用自己重新填了，直接按你有的标题屏蔽项来屏蔽热搜项"><input type="checkbox"
+                    v-model="menuUiSettings.blockedTrendingItemByTitleTag_Switch" />按已有的标题项屏蔽热搜项(?)</label>
         </div>
 
         <div class="menuOptions">
@@ -2423,8 +2427,9 @@ function addTrendingItemHiddenOrOverlay(trendingItem, blockedRulesText) {
         let overlay = document.createElement("div");
         overlay.className = "blockedOverlay";
         overlay.style.position = "absolute";
-        overlay.style.width = elementRect.width - parseFloat(window.getComputedStyle(trendingItem).paddingLeft) + "px"; // 使用 trendingItem 的宽度
+        overlay.style.width = elementRect.width + "px"; // 使用 trendingItem 的宽度
         overlay.style.height = elementRect.height + "px"; // 使用 trendingItem 的高度
+        overlay.style.transform = "translateX(-16px)";
         overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
         overlay.style.display = "flex";
         overlay.style.justifyContent = "center";
