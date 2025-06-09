@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-06-10 00:42:22
+ * @LastEditTime: 2025-06-10 00:51:26
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -22,7 +22,7 @@
 
 # 更新：
 
--   v1.4.1 修复 Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
+-   v1.4.1 修复 Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加层屏蔽时未对齐问题、修正部分菜单文本描述。
 
 -   v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。  
     旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。

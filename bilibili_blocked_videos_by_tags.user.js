@@ -12,7 +12,7 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
-// @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
+// @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加层屏蔽时未对齐问题、修正部分菜单文本描述。
 // @note            v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。
 // @note                   旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。
 // @note            v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。
@@ -54,24 +54,11 @@
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
 // @match           https://www.bilibili.com/*
-// @match           https://www.bilibili.com/v/popular/all/*
-// @match           https://www.bilibili.com/v/popular/weekly/*
-// @match           https://www.bilibili.com/v/popular/history/*
-// @exclude         https://www.bilibili.com/anime/*
-// @exclude         https://www.bilibili.com/movie/*
-// @exclude         https://www.bilibili.com/guochuang/*
-// @exclude         https://www.bilibili.com/variety/*
-// @exclude         https://www.bilibili.com/tv/*
-// @exclude         https://www.bilibili.com/documentary*
-// @exclude         https://www.bilibili.com/mooc/*
-// @exclude         https://www.bilibili.com/v/virtual/*
-// @exclude         https://www.bilibili.com/v/popular/music/*
-// @exclude         https://www.bilibili.com/v/popular/drama/*
 // @match           https://search.bilibili.com/*
-// @exclude         https://search.bilibili.com/live
 // @match           https://t.bilibili.com/*
 // @match           https://message.bilibili.com/*
 // @match           https://space.bilibili.com/*
+// @match           https://live.bilibili.com/*
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
