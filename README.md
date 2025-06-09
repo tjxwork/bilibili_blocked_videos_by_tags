@@ -2,16 +2,16 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-04-30 21:42:39
+ * @LastEditTime: 2025-06-09 23:24:33
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
- * Copyright (c) 2024 by tjxwork, All Rights Reserved.
+ * Copyright (c) 2025 by tjxwork, All Rights Reserved.
 -->
 
 # Bilibili Blocked Videos By Tags
 
-对 Bilibili.com 的视频卡片元素，以标题、UP 主、标签、双重标签、充电专属、收藏投币比、竖屏、时长、播放量、点赞率、视频分区、UP 主等级、UP 主粉丝数、UP 主简介、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频，附带去除广告等非视频元素的功能。
+对 Bilibili.com 的视频卡片元素，以标题、UP 主、标签、双重标签、充电专属、收藏投币比、竖屏、时长、播放量、点赞率、视频分区、UP 主等级、UP 主粉丝数、UP 主简介、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频，隐藏或屏蔽热搜、附带去除广告等非视频元素的功能。
 
 欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！  
 最下方有赞助二维码，或者前往作者的爱发电：[https://afdian.com/a/tjxgame](https://afdian.com/a/tjxgame)
@@ -22,9 +22,12 @@
 
 # 更新：
 
--   v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。  
+-   v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。  
+    旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。
+
+-   v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关 API，以减少触发风控的风险。  
     感谢 [xiaofeiTM233](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/16) 的补充提交。
-    
+
 -   v1.3.0 添加新功能：“屏蔽高于此收藏/投币比的视频”，感谢 [xmlhttp](https://greasyfork.org/zh-CN/users/68271-xmlhttp) 的建议。  
     为了保护新发的视频，只会处理播放数 5000+、收藏数 50+、发布时间 2 小时+的视频。  
     添加理由：收藏数量远大于投币的视频，大概是刷的数据，我个人投稿视频的收藏/投币比例，几乎没有高于 3 的，刷了半天视频，决定该默认值定为 10。  
@@ -92,6 +95,7 @@
 -   按置顶评论屏蔽（支持正则）
 -   按 UP 主的等级、粉丝数、简介（支持正则）进行屏蔽
 -   按白名单避免屏蔽指定 UP
+-   隐藏或者屏蔽热搜
 -   隐藏首页等页面的非视频元素（去除直播、广告、推广内容）
 -   生效页面：首页、各分区首页、播放页右侧推荐栏、搜索页面、综合热门、每周必看、入站必刷、排行榜、旧版首页(部分元素支持)
 -   导入、导出配置

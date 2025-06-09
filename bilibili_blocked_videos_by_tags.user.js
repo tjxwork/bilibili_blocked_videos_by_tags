@@ -1,15 +1,19 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.3.1
+// @version         1.4.0
 // @note
-// @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿●
+// @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
+// @note                   能终结一切的战争吗？双重标签屏蔽用法【tjxwork】
+// @note                   https://www.bilibili.com/video/BV1NoTyzBEsx
 // @note
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。
+// @note                   旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。
 // @note            v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。
 // @note                   感谢 [xiaofeiTM233](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/16) 的补充提交。
 // @note            v1.3.0 添加新功能：“屏蔽高于此收藏/投币比的视频”，感谢 [xmlhttp](https://greasyfork.org/zh-CN/users/68271-xmlhttp) 的建议。
@@ -44,7 +48,7 @@
 // @note            v1.0.0 菜单UI使用Vue3重构，现在不用担心缩放问题挡住UI了，界面更加现代化；
 // @note                   改进了判断逻辑，现在可以使用白名单来避免误杀关注的UP了；
 // @note                   新增功能：视频分区屏蔽、播放量屏蔽、点赞率屏蔽、竖屏视频屏蔽、UP主名称正则屏蔽、隐藏非视频元素、白名单避免屏蔽指定UP。
-// @description     对Bilibili的视频卡片，以标签、标题、UP主、时长、竖屏、充电、评论等信息来屏蔽视频，附带去除视频卡片中的直播、广告、推广内容的功能。
+// @description     对 Bilibili.com 的视频卡片元素，以标题、UP 主、标签、双重标签、充电专属、收藏投币比、竖屏、时长、播放量、点赞率、视频分区、UP 主等级、UP 主粉丝数、UP 主简介、精选评论、置顶评论来判断匹配，添加覆盖叠加层或隐藏视频，隐藏或屏蔽热搜、附带去除广告等非视频元素的功能。
 // @author          tjxwork
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
@@ -154,6 +158,17 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     // 白名单Up主和Uid
     whitelistNameOrUid_Switch: false,
     whitelistNameOrUid_Array: [],
+
+    // 隐藏热搜
+    hideTrending_Switch: false,
+
+    // 屏蔽热搜项，按标题、标签的项来
+    blockedTrendingItemByTitleTag_Switch: false,
+
+    // 屏蔽热搜项
+    blockedTrendingItem_Switch: false,
+    blockedTrendingItem_UseRegular: true,
+    blockedTrendingItem_Array: [],
 
     // 隐藏非视频元素
     hideNonVideoElements_Switch: true,
@@ -531,12 +546,12 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.2.0</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.0</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="不需要API，网页上直接有标题信息"><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽(?)</label>
+                <label title="不需要API，网页上直接有标题信息"><input type="checkbox" v-model="menuUiSettings.blockedTitle_Switch" />按标题屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -556,7 +571,7 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="大部分情况也是可以在网页上直接拿到"><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽(?)</label>
+                <label title="大部分情况也是可以在网页上直接拿到"><input type="checkbox" v-model="menuUiSettings.blockedNameOrUid_Switch" />按UP名称或Uid屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -579,7 +594,7 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="标签API，要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽(?)</label>
+                <label title="标签API，要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.blockedTag_Switch" />按标签屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -599,7 +614,10 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="标签API，要同时存在2个标签时才会生效，要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽(?)</label>
+                <label title="标签API，视频包含一对指定标签时才会生效，
+专门用来屏蔽引战视频，例如：原神|鸣潮
+这就看不到所有同时带“原神”“鸣潮”两个标签的视频。
+要注意有一些标签可能是分区"><input type="checkbox" v-model="menuUiSettings.doubleBlockedTag_Switch" />按双重标签屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -680,7 +698,7 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="视频API，现在视频的分区可能不是很好确定名字，可以看日志来判断"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽(?)</label>
+                <label title="视频API，现在视频的分区可能不是很好确定名字，可以看日志来判断"><input type="checkbox" v-model="menuUiSettings.blockedVideoPartitions_Switch" />按视频分区屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -720,7 +738,7 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="UP主API，是拿到UP主的简介后判断的"><input type="checkbox" v-model="menuUiSettings.blockedUpSigns_Switch" />按UP主简介屏蔽(?)</label>
+                <label title="UP主API，是拿到UP主的简介后判断的"><input type="checkbox" v-model="menuUiSettings.blockedUpSigns_Switch" />按UP主简介屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -747,7 +765,7 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
-                <label title="评论API，极易请求过多导致拒绝"><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽(?)</label>
+                <label title="评论API，极易请求过多导致拒绝"><input type="checkbox" v-model="menuUiSettings.blockedTopComment_Switch" />按置顶评论屏蔽视频(?)</label>
             </div>
 
             <div class="titleLabelRight">
@@ -770,7 +788,7 @@ let menuUiHTML = `
         <div class="menuOptions">
             <div class="titleLabelLeft">
                 <label title="白名单，在最后进行的判断，有最高的优先级"><input type="checkbox"
-                        v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽(?)</label>
+                        v-model="menuUiSettings.whitelistNameOrUid_Switch" />按UP名称或Uid避免屏蔽视频(?)</label>
             </div>
 
             <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
@@ -785,9 +803,41 @@ let menuUiHTML = `
         </div>
 
         
+        <div class="menuOptions">
+            <label title="直接隐藏所有的热搜项"><input type="checkbox"
+                    v-model="menuUiSettings.hideTrending_Switch" />隐藏搜索框的热搜内容(?)</label>
+        </div>
 
         <div class="menuOptions">
-            <label title="基本就是去广告、去直播、去综艺、去国漫之类的非投稿视频内容"><input type="checkbox"
+            <label title="不用自己重新填了，直接按你有的标题标签屏蔽项来屏蔽热搜项"><input type="checkbox"
+                    v-model="menuUiSettings.blockedTrendingItemByTitleTag_Switch" />按已有的标题、标签项屏蔽热搜项(?)</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
+                <label title="类似标题的用法，感觉不是很有必须单独做出来"><input type="checkbox"
+                        v-model="menuUiSettings.blockedTrendingItem_Switch" />按关键字屏蔽热搜项(?)</label>
+            </div>
+
+            <div class="titleLabelRight">
+                <label title="正则是什么可以问AI，你也可以理解成模糊匹配"><input type="checkbox" v-model="menuUiSettings.blockedTrendingItem_UseRegular" />启用正则(?)</label>
+            </div>
+
+            <input type="text" placeholder='多项输入请用英文逗号间隔' spellcheck="false"
+                v-model="tempInputValue.blockedTrendingItem_Array" /><button
+                @click="addArrayButton(tempInputValue, menuUiSettings, 'blockedTrendingItem_Array' )">添加</button>
+
+            <ul>
+                <li v-for="(value, index) in menuUiSettings.blockedTrendingItem_Array">
+                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTrendingItem_Array)">×</button>
+                </li>
+            </ul>
+        </div>
+
+
+
+        <div class="menuOptions">
+            <label title="基本就是去各种广告、去直播、去综艺、去国漫、去搜索页推广之类的非投稿视频内容"><input type="checkbox"
                     v-model="menuUiSettings.hideNonVideoElements_Switch" />隐藏首页等页面的非视频元素(?)</label>
         </div>
 
@@ -863,6 +913,7 @@ function blockedMenuUi() {
                 blockedTopComment_Array: "",
                 blockedUpSigns_Array: "",
                 whitelistNameOrUid_Array: "",
+                blockedTrendingItem_Array: "",
                 // 临时提示文本
                 promptText_Switch: true,
                 promptText_Opacity: 0,
@@ -1453,7 +1504,7 @@ function getBvAndTitle(videoElement) {
 
     // 没有拿到Bv号，提前结束
     if (!videoBv) {
-        consoleLogOutput(videoElement, "getBvAndTitle() 没有拿到Bv号 提前结束 跳过剩下主函数步骤");
+        // consoleLogOutput(videoElement, "getBvAndTitle() 没有拿到Bv号 提前结束 跳过剩下主函数步骤");
         return false;
     }
 
@@ -2312,13 +2363,94 @@ function handleWhitelistNameOrUid(videoBv) {
     }
 }
 
+// 热搜项 获取所有热搜项
+function getTrendingItemElements() {
+    let trendingItemElements = document.querySelectorAll("div.trending-item");
+    return trendingItemElements;
+}
+
+// 热搜项 处理匹配屏蔽的热搜项元素
+function handleBlockedTrendingItemElements(trendingItem, blockedTrendingItem_Array, useRegex) {
+    // 重复处理检查
+    if (trendingItem.style.display === "none" || trendingItem.querySelector(".blockedOverlay")) {
+        return;
+    }
+
+    // 是否启用正则
+    if (useRegex) {
+        // 使用 屏蔽热搜项数组 与 热搜项 进行匹配
+        const blockedTrendingHitItem = blockedTrendingItem_Array.find((blockedTrendingItem) => {
+            // 正则化屏蔽热搜项数组
+            const blockedTrendingItemRegEx = new RegExp(blockedTrendingItem);
+            // 判断 正则化的屏蔽热搜项数组 是否匹配 热搜项
+            if (blockedTrendingItemRegEx.test(trendingItem.textContent)) {
+                return true;
+            }
+        });
+
+        if (blockedTrendingHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            addTrendingItemHiddenOrOverlay(trendingItem, blockedTrendingHitItem);
+        }
+    } else {
+        // 使用 屏蔽热搜项数组 与 热搜项 进行匹配
+        const blockedTrendingHitItem = blockedTrendingItem_Array.find((blockedTrendingItem) => {
+            // 判断 屏蔽热搜项数组 是否匹配 热搜项
+            if (blockedTrendingItem === trendingItem.textContent) {
+                return true;
+            }
+        });
+
+        if (blockedTrendingHitItem) {
+            // 标记为屏蔽目标并记录触发的规则
+            addTrendingItemHiddenOrOverlay(trendingItem, blockedTrendingHitItem);
+        }
+    }
+}
+
+// 热搜项 隐藏或添加叠加层
+function addTrendingItemHiddenOrOverlay(trendingItem, blockedRulesText) {
+    // 是否为隐藏视频模式？
+    if (blockedParameter.hideVideoMode_Switch == true) {
+        trendingItem.style.display = "none";
+    } else {
+        // 添加叠加层
+
+        // 获取 trendingItem 的尺寸
+        const elementRect = trendingItem.getBoundingClientRect();
+
+        // 叠加层参数(背景)
+        let overlay = document.createElement("div");
+        overlay.className = "blockedOverlay";
+        overlay.style.position = "absolute";
+        overlay.style.width = elementRect.width - parseFloat(window.getComputedStyle(trendingItem).paddingLeft) + "px"; // 使用 trendingItem 的宽度
+        overlay.style.height = elementRect.height + "px"; // 使用 trendingItem 的高度
+        overlay.style.backgroundColor = "rgba(60, 60, 60, 0.85)";
+        overlay.style.display = "flex";
+        overlay.style.justifyContent = "center";
+        overlay.style.alignItems = "center";
+        overlay.style.zIndex = "10";
+        overlay.style.backdropFilter = "blur(6px)";
+        overlay.style.borderRadius = "6px";
+
+        // 叠加层文本参数(背景)
+        let overlayText = document.createElement("div");
+        overlayText.innerText = blockedRulesText;
+        overlayText.style.color = "rgb(250,250,250)";
+        overlay.appendChild(overlayText);
+
+        // 添加叠加层为最前面的子元素
+        trendingItem.insertAdjacentElement("afterbegin", overlay);
+    }
+}
+
 // 隐藏非视频元素
 function hideNonVideoElements() {
     // 判断当前页面URL是否以 https://www.bilibili.com/ 开头，即首页
     if (window.location.href.startsWith("https://www.bilibili.com/")) {
         // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
-        const adElements_1 = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
-        adElements_1.forEach(function (element) {
+        const adElements_home_page = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
+        adElements_home_page.forEach(function (element) {
             element.style.display = "none";
         });
     }
@@ -2326,8 +2458,8 @@ function hideNonVideoElements() {
     // 判断当前页面URL是否以 https://search.bilibili.com/all 开头，即搜索页——综合
     if (window.location.href.startsWith("https://search.bilibili.com/all")) {
         // 隐藏 搜索页——综合 下的 直播卡片
-        const adElements_2 = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--living)");
-        adElements_2.forEach(function (element) {
+        const adElements_live = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--living)");
+        adElements_live.forEach(function (element) {
             element.parentNode.style.display = "none";
             element.style.display = "none";
         });
@@ -2337,6 +2469,24 @@ function hideNonVideoElements() {
             'div.bili-video-card:has(a[href^="https://www.bilibili.com/cheese/"])'
         );
         adElements_cheese.forEach(function (element) {
+            if (element.parentNode) {
+                element.parentNode.style.display = "none";
+            }
+        });
+
+        // 隐藏 搜索页——综合 下的 广告卡片
+        const adElements_info_ad = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--ad)");
+        adElements_info_ad.forEach(function (element) {
+            if (element.parentNode) {
+                element.parentNode.style.display = "none";
+            }
+        });
+
+        // 隐藏 搜索页——综合 下的 推广卡片
+        const adElements_info_ad_creative = document.querySelectorAll(
+            "div.bili-video-card:has(svg.bili-video-card__info--ad-creative)"
+        );
+        adElements_info_ad_creative.forEach(function (element) {
             if (element.parentNode) {
                 element.parentNode.style.display = "none";
             }
@@ -2358,14 +2508,14 @@ function hideNonVideoElements() {
 
     // 隐藏视频播放页右侧广告、视频相关的游戏推荐、视频相关的特殊推荐、大家围观的直播
     const adElements_4 = document.querySelectorAll(
-        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.video-page-operator-card-small, div.pop-live-small-mode, div.ad-report, div.activity-m-v1, div.video-card-ad-small"
+        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.video-page-operator-card-small, div.pop-live-small-mode, div.ad-report, div.activity-m-v1, div.video-card-ad-small "
     );
     adElements_4.forEach(function (element) {
         element.style.display = "none";
     });
 }
 
-// 屏蔽或者取消屏蔽
+// 屏蔽视频或者取消屏蔽视频
 function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
     // 是白名单目标，是屏蔽目标，没有隐藏、没有叠加层：跳过
     if (
@@ -2548,7 +2698,39 @@ function FuckYouBilibiliRecommendationSystem() {
         lastConsoleVideoInfoDict = Object.assign({}, videoInfoDict);
     }
 
-    // 获取所有包含B站视频相关标签的视频元素
+    // 是否启用 隐藏热搜
+    if (blockedParameter.hideTrending_Switch) {
+        const trendingModuleElements = document.querySelectorAll("div.trending");
+        trendingModuleElements.forEach((element) => {
+            element.style.display = "none";
+        });
+    }
+
+    // 获取所有热搜项元素
+    const trendingItemElements = getTrendingItemElements();
+
+    // 遍历每个热搜项元素
+    trendingItemElements.forEach((trendingItemElement) => {
+        // 启用 屏蔽热搜项
+        if (blockedParameter.blockedTrendingItem_Switch) {
+            handleBlockedTrendingItemElements(
+                trendingItemElement,
+                blockedParameter.blockedTrendingItem_Array,
+                blockedParameter.blockedTrendingItem_UseRegular
+            );
+        }
+
+        // 启用 屏蔽热搜项，按标题、标签的项来
+        if (blockedParameter.blockedTrendingItemByTitleTag_Switch) {
+            handleBlockedTrendingItemElements(
+                trendingItemElement,
+                blockedParameter.blockedTitle_Array,
+                blockedParameter.blockedTitle_UseRegular
+            );
+        }
+    });
+
+    // 获取所有包含B站视频的元素
     const videoElements = getVideoElements();
 
     // 遍历每个视频元素
@@ -2640,7 +2822,11 @@ function FuckYouBilibiliRecommendationSystem() {
         }
 
         // 是否需要 API获取视频UP主信息
-        if ((blockedParameter.blockedBelowUpLevel_Switch && blockedParameter.blockedBelowUpLevel > 0) || (blockedParameter.blockedBelowUpFans_Switch && blockedParameter.blockedBelowUpFans > 0) || (blockedParameter.blockedUpSigns_Switch && blockedParameter.blockedUpSigns_Array.length > 0)) {
+        if (
+            (blockedParameter.blockedBelowUpLevel_Switch && blockedParameter.blockedBelowUpLevel > 0) ||
+            (blockedParameter.blockedBelowUpFans_Switch && blockedParameter.blockedBelowUpFans > 0) ||
+            (blockedParameter.blockedUpSigns_Switch && blockedParameter.blockedUpSigns_Array.length > 0)
+        ) {
             // 判断请求 API获取视频UP主信息
             getVideoApiUpInfo(videoBv);
         }
@@ -2664,7 +2850,10 @@ function FuckYouBilibiliRecommendationSystem() {
         }
 
         // 是否需要 API获取视频标签
-        if ((blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) || (blockedParameter.doubleBlockedTag_Switch && blockedParameter.doubleBlockedTag_Array.length > 0)) {
+        if (
+            (blockedParameter.blockedTag_Switch && blockedParameter.blockedTag_Array.length > 0) ||
+            (blockedParameter.doubleBlockedTag_Switch && blockedParameter.doubleBlockedTag_Array.length > 0)
+        ) {
             // 判断请求 API获取视频标签
             getVideoApiTags(videoBv);
         }
@@ -2682,7 +2871,10 @@ function FuckYouBilibiliRecommendationSystem() {
         }
 
         // 是否需要 API获取视频评论区
-        if (blockedParameter.blockedFilteredCommentsVideo_Switch || (blockedParameter.blockedTopComment_Switch && blockedParameter.blockedTopComment_Array.length > 0)) {
+        if (
+            blockedParameter.blockedFilteredCommentsVideo_Switch ||
+            (blockedParameter.blockedTopComment_Switch && blockedParameter.blockedTopComment_Array.length > 0)
+        ) {
             // 判断请求 API获取视频评论区
             getVideoApiComments(videoBv);
         }
