@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-06-10 00:51:26
+ * @LastEditTime: 2025-06-12 18:23:52
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -21,6 +21,8 @@
 **右上角三个点菜单->“扩展”->“管理扩展”->左下方打开“开发人员模式”**
 
 # 更新：
+
+-   v1.4.2 修复 Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
 
 -   v1.4.1 修复 Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加层屏蔽时未对齐问题、修正部分菜单文本描述。
 

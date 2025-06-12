@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.1
+// @version         1.4.2
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
@@ -12,7 +12,8 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
-// @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加层屏蔽时未对齐问题、修正部分菜单文本描述。
+// @note            v1.4.2 修复Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
+// @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
 // @note            v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。
 // @note                   旧功能完善：“隐藏首页等页面的非视频元素” 添加隐藏搜索页下的广告卡片、推广卡片。
 // @note            v1.3.1 优化代码逻辑：判断是否启用了相关选项来决定是否调用相关API，以减少触发风控的风险。
@@ -54,11 +55,13 @@
 // @license         CC-BY-NC-SA
 // @icon            https://www.bilibili.com/favicon.ico
 // @match           https://www.bilibili.com/*
-// @match           https://search.bilibili.com/*
-// @match           https://t.bilibili.com/*
-// @match           https://message.bilibili.com/*
-// @match           https://space.bilibili.com/*
 // @match           https://live.bilibili.com/*
+// @match           https://search.bilibili.com/*
+// @match           https://space.bilibili.com/*
+// @match           https://account.bilibili.com/*
+// @match           https://message.bilibili.com/*
+// @match           https://t.bilibili.com/*
+// @match           https://link.bilibili.com/*
 // @grant           GM_registerMenuCommand
 // @grant           GM_setValue
 // @grant           GM_getValue
@@ -173,6 +176,26 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
     // 控制台输出日志
     consoleOutputLog_Switch: false,
 });
+
+// 不需要屏蔽视频的页面
+const noBlockedVideoUrls = [
+    // B站动漫频道（含子页面）
+    /^https:\/\/www\.bilibili\.com\/anime\//,
+    // 直播页面（含子路径）
+    /^https:\/\/live\.bilibili\.com\//,
+    // 账号中心相关页面
+    /^https:\/\/account\.bilibili\.com\//,
+    // 消息中心
+    /^https:\/\/message\.bilibili\.com\//,
+    // 动态相关服务（如 t.bilibili.com）
+    /^https:\/\/t\.bilibili\.com\//,
+    // 用户、收藏列表（如 /space/用户名/favlist/）
+    /^https:\/\/space\.bilibili\.com\/[0-9]+/,
+    // 历史记录页面（仅路径，不含子路径）
+    /^https:\/\/www\.bilibili\.com\/history/,
+    // 直播设置
+    /^https:\/\/link\.bilibili\.com\//,
+];
 
 // 旧参数适配
 function oldParameterAdaptation(obj) {
@@ -2354,6 +2377,12 @@ function handleWhitelistNameOrUid(videoBv) {
     }
 }
 
+// 判断当前网址是否符合
+function determineURL(urlRules, currentUrl) {
+    // 检查是否匹配任意规则
+    return urlRules.some((urlRule) => urlRule.test(currentUrl));
+}
+
 // 热搜项 获取所有热搜项
 function getTrendingItemElements() {
     let trendingItemElements = document.querySelectorAll("div.trending-item");
@@ -2721,6 +2750,11 @@ function FuckYouBilibiliRecommendationSystem() {
             );
         }
     });
+
+    // 跳过不需要屏蔽视频的页面
+    if (determineURL(noBlockedVideoUrls, window.location.href)) {
+        return;
+    }
 
     // 获取所有包含B站视频的元素
     const videoElements = getVideoElements();
