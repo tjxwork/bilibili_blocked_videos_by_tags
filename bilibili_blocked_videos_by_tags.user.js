@@ -1,17 +1,21 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.2
+// @version         1.4.3
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
+// @note
 // @note                   应该是目前B站最强的屏蔽视频插件？【tjxgame】
 // @note                   https://www.bilibili.com/video/BV1WJ4m1u79n
 // @note                   能终结一切的战争吗？双重标签屏蔽用法【tjxwork】
 // @note                   https://www.bilibili.com/video/BV1NoTyzBEsx
 // @note
+// @note                   你们这些拿我脚本做二游视频的，能不能贴一下我视频地址……
+// @note
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.4.3 旧功能更新：重写了“隐藏首页等页面的非视频元素” 功能的代码，补增生效范围以应对更新后的广告项目。
 // @note            v1.4.2 修复Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
 // @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
 // @note            v1.4.0 添加新功能：“隐藏搜索框的热搜内容”、“按已有标题、标签项屏蔽热搜项”、“按关键字屏蔽热搜项”，感谢来自 @云布绛茜乐 的赞助需求。
@@ -554,13 +558,18 @@ GM_addStyle(`
     }
 }
 
+/* 隐藏广告 */
+.hideAD { 
+    display: none !important; 
+}
+
 `);
 
 // 菜单UI的HTML
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.0</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.3</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
@@ -2469,71 +2478,55 @@ function addTrendingItemHiddenOrOverlay(trendingItem, blockedRulesText) {
 function hideNonVideoElements() {
     // 判断当前页面URL是否以 https://www.bilibili.com/ 开头，即首页
     if (window.location.href.startsWith("https://www.bilibili.com/")) {
-        // 隐藏首页的番剧、国创、直播等左上角有标的元素，以及左上角没标的直播
-        const adElements_home_page = document.querySelectorAll("div.floor-single-card, div.bili-live-card");
-        adElements_home_page.forEach(function (element) {
-            element.style.display = "none";
-        });
+        // 首页 左上角有标的，赛事、直播、番剧、国创、综艺、课堂、电影、电视剧、漫画
+        // 首页 推广视频、广告
+        // 首页 直播
+        document
+            .querySelectorAll(
+                `
+            div.floor-single-card, 
+            div.feed-card:has(a[href^="//cm.bilibili.com/"]),
+            div.bili-feed-card:has(a[href^="//cm.bilibili.com/"]),
+            div.bili-feed-card:has(a[href^="https://live.bilibili.com/"])
+            `
+            )
+            .forEach((el) => el.classList.add("hideAD")); // 使用 CSS 类替代直接样式操作
     }
 
     // 判断当前页面URL是否以 https://search.bilibili.com/all 开头，即搜索页——综合
     if (window.location.href.startsWith("https://search.bilibili.com/all")) {
-        // 隐藏 搜索页——综合 下的 直播卡片
-        const adElements_live = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--living)");
-        adElements_live.forEach(function (element) {
-            element.parentNode.style.display = "none";
-            element.style.display = "none";
-        });
-
-        // 隐藏 搜索页——综合 下的 课堂卡片
-        const adElements_cheese = document.querySelectorAll(
-            'div.bili-video-card:has(a[href^="https://www.bilibili.com/cheese/"])'
-        );
-        adElements_cheese.forEach(function (element) {
-            if (element.parentNode) {
-                element.parentNode.style.display = "none";
-            }
-        });
-
-        // 隐藏 搜索页——综合 下的 广告卡片
-        const adElements_info_ad = document.querySelectorAll("div.bili-video-card:has(div.bili-video-card__info--ad)");
-        adElements_info_ad.forEach(function (element) {
-            if (element.parentNode) {
-                element.parentNode.style.display = "none";
-            }
-        });
-
-        // 隐藏 搜索页——综合 下的 推广卡片
-        const adElements_info_ad_creative = document.querySelectorAll(
-            "div.bili-video-card:has(svg.bili-video-card__info--ad-creative)"
-        );
-        adElements_info_ad_creative.forEach(function (element) {
-            if (element.parentNode) {
-                element.parentNode.style.display = "none";
-            }
-        });
+        // 搜索页 课堂
+        // 搜索页 推广视频、广告
+        // 搜索页 直播
+        document
+            .querySelectorAll(
+                `
+            div.bili-video-card:has(a[href^="https://www.bilibili.com/cheese/"]),
+            div.bili-video-card:has(a[href^="//cm.bilibili.com/"]),
+            div.bili-video-card:has(a[href^="//live.bilibili.com/"])
+            `
+            )
+            .forEach((el) => el.parentNode.classList.add("hideAD")); // 使用 CSS 类替代直接样式操作，要屏蔽父级
     }
 
-    // 隐藏首页广告，那些没有“enable-no-interest” CSS类的视频卡片元素
-    const adElements_3 = document.querySelectorAll("div.bili-video-card.is-rcmd:not(.enable-no-interest)");
-    adElements_3.forEach(function (element) {
-        // 检查其父元素是否是 .feed-card
-        if (element.closest("div.feed-card") !== null) {
-            // 如果是，选择其父元素并应用样式
-            element.closest("div.feed-card").style.display = "none";
-        } else {
-            // 如果不是，直接在视频元素上应用样式
-            element.style.display = "none";
-        }
-    });
-
-    // 隐藏视频播放页右侧广告、视频相关的游戏推荐、视频相关的特殊推荐、大家围观的直播
-    const adElements_4 = document.querySelectorAll(
-        "div#slide_ad, a.ad-report, div.video-page-game-card-small, div.video-page-special-card-small, div.video-page-operator-card-small, div.pop-live-small-mode, div.ad-report, div.activity-m-v1, div.video-card-ad-small "
-    );
-    adElements_4.forEach(function (element) {
-        element.style.display = "none";
-    });
+    // 判断当前页面URL是否以 https://www.bilibili.com/video/ 开头，即视频播放页
+    if (window.location.href.startsWith("https://www.bilibili.com/video/")) {
+        // 全是视频播放页里面的广告
+        document
+            .querySelectorAll(
+                `
+            div#slide_ad,
+            .ad-report,
+            div.video-page-game-card-small,
+            div.video-page-special-card-small,
+            div.video-page-operator-card-small,
+            div.pop-live-small-mode,
+            div.activity-m-v1,
+            div.video-card-ad-small
+            `
+            )
+            .forEach((el) => el.classList.add("hideAD")); // 使用 CSS 类替代直接样式操作
+    }
 }
 
 // 屏蔽视频或者取消屏蔽视频

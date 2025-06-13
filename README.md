@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-06-12 18:23:52
+ * @LastEditTime: 2025-06-13 21:40:24
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -21,6 +21,8 @@
 **右上角三个点菜单->“扩展”->“管理扩展”->左下方打开“开发人员模式”**
 
 # 更新：
+
+-   v1.4.3 旧功能更新：重写了“隐藏首页等页面的非视频元素” 功能的代码，补增生效范围以应对更新后的广告项目。
 
 -   v1.4.2 修复 Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
 
