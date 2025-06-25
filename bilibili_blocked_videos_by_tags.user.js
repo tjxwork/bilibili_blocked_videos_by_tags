@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.3
+// @version         1.4.4
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note
@@ -15,6 +15,7 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.4.4 功能适配更新：对“隐藏视频而不是使用叠加层覆盖”功能，适配了B站更新后的首页元素变化。
 // @note            v1.4.3 旧功能更新：重写了“隐藏首页等页面的非视频元素” 功能的代码，补增生效范围以应对更新后的广告项目。
 // @note            v1.4.2 修复Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
 // @note            v1.4.1 修复Bug：补全部分页面缺失的热搜栏屏蔽、修正部分页面热搜栏使用叠加屏屏蔽时未对齐问题、修正部分菜单文本描述。
@@ -71,8 +72,6 @@
 // @grant           GM_getValue
 // @grant           GM_addStyle
 // @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
-// @downloadURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.user.js
-// @updateURL https://update.greasyfork.org/scripts/481629/Bilibili%20%E6%8C%89%E6%A0%87%E7%AD%BE%E3%80%81%E6%A0%87%E9%A2%98%E3%80%81%E6%97%B6%E9%95%BF%E3%80%81UP%E4%B8%BB%E5%B1%8F%E8%94%BD%E8%A7%86%E9%A2%91.meta.js
 // ==/UserScript==
 
 "use strict";
@@ -569,7 +568,7 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.3</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.4</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
@@ -2585,13 +2584,25 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
                 // 为什么改了父元素，还要改元素本身？为了方便上面的判断。
                 videoElement.style.display = "none";
             }
-            // 如果是父元素是feed-card，修改父元素
-            else if (videoElement.closest("div.feed-card") !== null) {
-                videoElement.closest("div.feed-card").style.display = "none";
+
+            // 如果是父元素或之上是 feed-card，修改父元素
+            const divFeedCard = videoElement.closest("div.feed-card");
+            if (divFeedCard !== null) {
+                divFeedCard.style.display = "none";
                 videoElement.style.display = "none";
-            } else {
-                videoElement.style.display = "none";
+                return;
             }
+
+            // 如果是父元素或之上是 bili-feed-card，修改父元素
+            const divBiliFeedCard = videoElement.closest("div.bili-feed-card");
+            if (divBiliFeedCard !== null) {
+                divBiliFeedCard.style.display = "none";
+                videoElement.style.display = "none";
+                return;
+            }
+
+            // 默认情况
+            videoElement.style.display = "none";
         } else {
             // 添加叠加层
 
@@ -2658,18 +2669,31 @@ function blockedOrUnblocked(videoElement, videoBv, setTimeoutStatu = false) {
         if (blockedParameter.hideVideoMode_Switch == true) {
             // 取消隐藏
 
-            // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面
+            // 判断当前页面URL是否以 https://search.bilibili.com/ 开头，即搜索页面，修改父元素
             if (window.location.href.startsWith("https://search.bilibili.com/")) {
                 videoElement.parentNode.style.display = "";
+                // 为什么改了父元素，还要改元素本身？为了方便上面的判断。
                 videoElement.style.display = "";
             }
-            // 如果是父元素是feed-card
-            else if (videoElement.closest("div.feed-card") !== null) {
-                videoElement.closest("div.feed-card").style.display = "";
+
+            // 如果是父元素或之上是 feed-card，修改父元素
+            const divFeedCard = videoElement.closest("div.feed-card");
+            if (divFeedCard !== null) {
+                divFeedCard.style.display = "";
                 videoElement.style.display = "";
-            } else {
-                videoElement.style.display = "";
+                return;
             }
+
+            // 如果是父元素或之上是 bili-feed-card，修改父元素
+            const divBiliFeedCard = videoElement.closest("div.bili-feed-card");
+            if (divBiliFeedCard !== null) {
+                divBiliFeedCard.style.display = "";
+                videoElement.style.display = "";
+                return;
+            }
+
+            // 默认情况
+            videoElement.style.display = "";
         } else {
             // 删除叠加层
             if (videoElement.firstElementChild.className == "blockedOverlay") {
