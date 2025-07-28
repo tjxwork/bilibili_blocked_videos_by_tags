@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.4
+// @version         1.4.5
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note
@@ -15,6 +15,7 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.4.5 功能故障修复：修复字节跳动 Vue CDN 失效所导致功能界面不正常问题，感谢[abh0r](https://github.com/abh0r)的提醒
 // @note            v1.4.4 功能适配更新：对“隐藏视频而不是使用叠加层覆盖”功能，适配了B站更新后的首页元素变化。
 // @note            v1.4.3 旧功能更新：重写了“隐藏首页等页面的非视频元素” 功能的代码，补增生效范围以应对更新后的广告项目。
 // @note            v1.4.2 修复Bug：修复视频屏蔽的生效范围错误问题，如：收藏、播放历史等。
@@ -71,7 +72,10 @@
 // @grant           GM_setValue
 // @grant           GM_getValue
 // @grant           GM_addStyle
-// @require         https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-w/vue/3.2.31/vue.global.min.js
+// @require         https://cdnjs.cloudflare.com/ajax/libs/vue/3.2.31/vue.global.min.js
+// @require         https://cdn.bootcdn.net/ajax/libs/vue/3.2.31/vue.global.prod.min.js
+// @require         https://cdn.jsdelivr.net/npm/vue@3.2.31/dist/vue.global.min.js
+
 // ==/UserScript==
 
 "use strict";
@@ -568,7 +572,7 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.4</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.5</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">

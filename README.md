@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-06-25 23:15:06
+ * @LastEditTime: 2025-07-28 18:55:23
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -21,6 +21,8 @@
 **右上角三个点菜单->“扩展”->“管理扩展”->左下方打开“开发人员模式”**
 
 # 更新：
+
+-   v1.4.5 功能故障修复：修复字节跳动 Vue CDN 失效所导致功能界面不正常问题，感谢[abh0r](https://github.com/abh0r)的提醒。
 
 -   v1.4.4 功能适配更新：对“隐藏视频而不是使用叠加层覆盖”功能，适配了 B 站更新后的首页元素变化。
 
