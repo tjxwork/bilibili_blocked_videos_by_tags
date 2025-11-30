@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Bilibili 按标签、标题、时长、UP主屏蔽视频
 // @namespace       https://github.com/tjxwork
-// @version         1.4.5
+// @version         1.5.0
 // @note
 // @note            新版本的视频介绍，来拯救一下我可怜的播放量吧 ●︿● (第二个视频直接搜不到……)
 // @note
@@ -15,6 +15,14 @@
 // @note            作者的爱发电：https://afdian.com/a/tjxgame
 // @note            欢迎订阅支持、提需求，您的赞助支持就是维护更新的最大动力！
 // @note
+// @note            v1.5.0 添加新功能： “显示叠加层/关闭叠加层”，可以实时切换是否显示屏蔽叠加层。（我感觉很多人会忍不住关掉屏蔽叠加层看……）
+// @note                   添加新功能： “隐藏菜单中的屏蔽词”，可以把菜单中的屏蔽词字符串隐藏成“屏蔽词1、屏蔽词2”的效果，感谢来自 @Il 的赞助需求。
+// @note                   PS：还活着，但是现在的工作很忙、很折磨人，全是和人打交道的。
+// @note                   也有看到GitHub最近的 [DostGit](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/25) [DragonWuuu](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/26) 
+// @note                   这两位提交的合并请求，很感谢两位的热心贡献，不是我不想合并，但是现在快3000行，维护起来有点头大，合并新功能后就更多了……
+// @note                   原本打算尝试拆分重构整个脚本再合并进去，也方便后面维护和添加新功能，拆到一半又一堆事情催命，再捡起来又忘得差不多了，就一直拖延下去了。
+// @note                   现在除了修明显的Bug外，暂时不打算添加什么太复杂、会动到结构的新功能了，精力和能力有限，支撑不住，等重构完再考虑吧。
+// @note                   也有一部分原因是我觉得必要的核心功能其实已经做得差不多了，剩下能加的功能基本都是完善体验方面的了。
 // @note            v1.4.5 功能故障修复：修复字节跳动 Vue CDN 失效所导致功能界面不正常问题，感谢[abh0r](https://github.com/abh0r)的提醒
 // @note            v1.4.4 功能适配更新：对“隐藏视频而不是使用叠加层覆盖”功能，适配了B站更新后的首页元素变化。
 // @note            v1.4.3 旧功能更新：重写了“隐藏首页等页面的非视频元素” 功能的代码，补增生效范围以应对更新后的广告项目。
@@ -182,6 +190,9 @@ let blockedParameter = GM_getValue("GM_blockedParameter", {
 
     // 控制台输出日志
     consoleOutputLog_Switch: false,
+
+    // 隐藏菜单中的屏蔽词
+    hideBlockedWordsInMenu_Switch: false,
 });
 
 // 不需要屏蔽视频的页面
@@ -572,7 +583,7 @@ GM_addStyle(`
 let menuUiHTML = `
 
 <div id="blockedMenuUi">
-    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.4.5</div>
+    <div id="menuTitle">Bilibili按标签、标题、时长、UP主屏蔽视频 v1.5.0</div>
 
     <div id="menuOptionsList">
         <div class="menuOptions">
@@ -590,7 +601,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedTitle_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTitle_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedTitle_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -610,7 +621,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedNameOrUid_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedNameOrUid_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedNameOrUid_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -633,7 +644,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedTag_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTag_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedTag_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -656,7 +667,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.doubleBlockedTag_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.doubleBlockedTag_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.doubleBlockedTag_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -737,7 +748,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedVideoPartitions_Array">
-                    {{value}}<button
+                    {{getDisplayText(value, index)}}<button
                         @click="delArrayButton(index, menuUiSettings.blockedVideoPartitions_Array)">×</button>
                 </li>
             </ul>
@@ -777,7 +788,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedUpSigns_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedUpSigns_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedUpSigns_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -804,7 +815,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedTopComment_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTopComment_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedTopComment_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -823,7 +834,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.whitelistNameOrUid_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.whitelistNameOrUid_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.whitelistNameOrUid_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -855,7 +866,7 @@ let menuUiHTML = `
 
             <ul>
                 <li v-for="(value, index) in menuUiSettings.blockedTrendingItem_Array">
-                    {{value}}<button @click="delArrayButton(index, menuUiSettings.blockedTrendingItem_Array)">×</button>
+                    {{getDisplayText(value, index)}}<button @click="delArrayButton(index, menuUiSettings.blockedTrendingItem_Array)">×</button>
                 </li>
             </ul>
         </div>
@@ -876,6 +887,10 @@ let menuUiHTML = `
         </div>
 
         <div class="menuOptions">
+            <label title="启用后，菜单中的屏蔽词将显示为'屏蔽词1'、'屏蔽词2'等，不影响实际屏蔽功能和导入导出"><input type="checkbox" v-model="menuUiSettings.hideBlockedWordsInMenu_Switch" />隐藏菜单中的屏蔽词(?)</label>
+        </div>
+
+        <div class="menuOptions">
             <label title="你可以看到一堆的报错！"><input type="checkbox" v-model="menuUiSettings.consoleOutputLog_Switch" />控制台输出日志开关(?)</label>
         </div>
 
@@ -889,6 +904,7 @@ let menuUiHTML = `
         <button @click="importButton()">导入</button>
         <button @click="authorButton()">作者</button>
         <button @click="supportButton()">赞助</button>
+        <button @click="toggleOverlayButton()" style="font-size: 12px; line-height: 16px;">{{tempInputValue.overlayVisible ? '关闭' : '显示'}}<br>叠加层</button>
 
     <div id="alipayWeChatQrCode" v-show="tempInputValue.QrCode_Switch">
         <label>感谢赞助，二维码暂停使用，即将跳转到爱发电</label>
@@ -946,6 +962,8 @@ function blockedMenuUi() {
                 promptText: "",
                 // 二维码显示开关
                 QrCode_Switch: false,
+                // 叠加层可见状态（临时，不保存）
+                overlayVisible: true,
             });
 
             // 显示临时提示文本
@@ -1004,6 +1022,14 @@ function blockedMenuUi() {
                 array.splice(index, 1);
             };
 
+            // 获取显示文本（隐藏屏蔽词功能）
+            const getDisplayText = (value, index) => {
+                if (menuUiSettings.hideBlockedWordsInMenu_Switch) {
+                    return `屏蔽词${index + 1}`;
+                }
+                return value;
+            };
+
             // 读取按钮 深拷贝函数，递归处理嵌套对象，普通对象 to 普通对象/响应式对象
             function deepCopy(source, target) {
                 for (let key in source) {
@@ -1020,6 +1046,16 @@ function blockedMenuUi() {
             const refreshButton = () => {
                 // 使用 deepCopy 函数进行深拷贝
                 deepCopy(blockedParameter, menuUiSettings);
+
+                // 读取叠加层的实际显示状态
+                const firstOverlay = document.querySelector("div.blockedOverlay");
+                if (firstOverlay) {
+                    // 如果存在叠加层，根据其display状态来设置overlayVisible
+                    tempInputValue.overlayVisible = firstOverlay.style.display !== "none";
+                } else {
+                    // 如果不存在叠加层，默认为可见状态
+                    tempInputValue.overlayVisible = true;
+                }
 
                 showPromptText("读取数据");
             };
@@ -1169,6 +1205,28 @@ function blockedMenuUi() {
                 showPromptText("感谢老板！");
             };
 
+            // 切换叠加层可见性
+            const toggleOverlayButton = () => {
+                tempInputValue.overlayVisible = !tempInputValue.overlayVisible;
+
+                // 获取所有屏蔽叠加层元素
+                const overlays = document.querySelectorAll("div.blockedOverlay");
+
+                if (tempInputValue.overlayVisible) {
+                    // 显示叠加层
+                    overlays.forEach((el) => {
+                        el.style.display = "flex";
+                    });
+                    showPromptText("叠加层已显示");
+                } else {
+                    // 隐藏叠加层
+                    overlays.forEach((el) => {
+                        el.style.display = "none";
+                    });
+                    showPromptText("叠加层已隐藏");
+                }
+            };
+
             // 打开菜单时，先加载一次数据
             refreshButton();
 
@@ -1177,6 +1235,7 @@ function blockedMenuUi() {
                 tempInputValue,
                 addArrayButton,
                 delArrayButton,
+                getDisplayText,
                 refreshButton,
                 saveButton,
                 closeButton,
@@ -1184,6 +1243,7 @@ function blockedMenuUi() {
                 importButton,
                 supportButton,
                 authorButton,
+                toggleOverlayButton,
             };
         },
     }).mount("#blockedMenuUi");
