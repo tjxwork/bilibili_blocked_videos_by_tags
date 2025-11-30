@@ -3030,3 +3030,681 @@ let targetNode = document.body;
 let config = { childList: true, subtree: true };
 // 启动观察器并传入回调函数和配置选项
 observer.observe(targetNode, config);
+
+// ---------------补充内容----------------
+(function () {
+    // 创建配置按钮
+    const btn = document.createElement("button");
+    btn.textContent = "脚本配置";
+    btn.style.position = "fixed";
+    btn.style.bottom = "20px";
+    btn.style.right = "20px";
+    btn.style.zIndex = "999999";
+    btn.style.padding = "8px 12px";
+    btn.style.background = "#0094CA";
+    btn.style.color = "#fff";
+    btn.style.border = "none";
+    btn.style.borderRadius = "6px";
+    btn.style.cursor = "pointer";
+
+    // 点击按钮打开配置面板
+    btn.addEventListener("click", () => {
+        blockedMenuUi(); // 调用已有的UI函数
+    });
+
+    document.body.appendChild(btn);
+
+    // 标签复制功能
+    const SELECTOR = 'div.bili-video-card.is-rcmd';
+    const tagsCache = {};
+
+    function av2bv(aid) {
+        const XOR_CODE = 23442827791579n;
+        const MASK_CODE = 2251799813685247n;
+        const MAX_AID = 1n << 51n;
+        const BASE = 58n;
+        const data = 'FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf';
+        const bytes = ['B', 'V', '1', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
+        let bvIndex = bytes.length - 1;
+        let tmp = (MAX_AID | BigInt(aid)) ^ XOR_CODE;
+        while (tmp > 0) {
+            bytes[bvIndex] = data[Number(tmp % BigInt(BASE))];
+            tmp = tmp / BASE;
+            bvIndex -= 1;
+        }
+        [bytes[3], bytes[9]] = [bytes[9], bytes[3]];
+        [bytes[4], bytes[7]] = [bytes[7], bytes[4]];
+        return bytes.join('');
+    }
+
+    function extractBv(card) {
+        const a = card.querySelector('a.bili-video-card__image--link');
+        if (!a) return null;
+        const href = a.href || '';
+        const bvMatch = href.match(/\/(BV[0-9A-Za-z]+)/);
+        if (bvMatch) return bvMatch[1];
+        const avMatch = href.match(/\/(av)(\d+)/i);
+        if (avMatch) return av2bv(avMatch[2]);
+        return null;
+    }
+
+    async function fetchTags(bv) {
+        if (!bv) return '';
+        if (tagsCache[bv]) return tagsCache[bv];
+        try {
+            const resp = await fetch(`https://api.bilibili.com/x/web-interface/view/detail/tag?bvid=${bv}`, { credentials: 'omit' });
+            const j = await resp.json();
+            let tags = '';
+            if (j && Array.isArray(j.data)) {
+                tags = j.data.map(t => t.tag_name.replace(/\s+/g, '')).filter(Boolean).join(',');
+            } else if (j && j.data && Array.isArray(j.data.tags)) {
+                tags = j.data.tags.map(t => t.tag_name || t).filter(Boolean).join(',');
+            }
+            tagsCache[bv] = tags;
+            return tags;
+        } catch (e) {
+            tagsCache[bv] = '';
+            return '';
+        }
+    }
+
+    function showTempText(btn, msg, timeout = 1400) {
+        const old = btn.innerText;
+        btn.innerText = msg;
+        setTimeout(() => { btn.innerText = old; }, timeout);
+    }
+    // 标签复制按钮
+    function addButtonToCard(card) {
+        if (card.dataset.copyTagsBtnAdded) return;
+        card.dataset.copyTagsBtnAdded = '1';
+        card.style.position = card.style.position || 'relative';
+
+        const btnHTML = `<button type="button" class="gm-copy-tags-btn"
+        style="position: absolute; bottom: 6px; right: 6px; z-index: 100; padding: 4px 8px; font-size: 12px; background: #0094CA; color: #fff; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+        📋
+    </button>`;
+        card.insertAdjacentHTML('beforeend', btnHTML);
+
+        const btn = card.querySelector('.gm-copy-tags-btn');
+        if (!btn) return;
+        if (btn.dataset.listenerAdded) return;
+        btn.dataset.listenerAdded = '1';
+
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            btn.disabled = true;
+            const bv = extractBv(card);
+            if (!bv) {
+                showTempText(btn, '未找到BV');
+                btn.disabled = false;
+                return;
+            }
+            const tags = await fetchTags(bv);
+            if (tags) {
+                // 改为打开标签选择UI而不是直接复制
+                showTagSelectionUI(tags.split(','), bv);
+                showTempText(btn, '标签已加载');
+            } else {
+                showTempText(btn, '无标签');
+            }
+            btn.disabled = false;
+        });
+    }
+    // 标签选择UI
+    function showTagSelectionUI(tags, bv) {
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.zIndex = '10000';
+        modal.style.background = '#2a2a2a';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '8px';
+        modal.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        modal.style.maxWidth = '80%';
+        modal.style.maxHeight = '80%';
+        modal.style.overflow = 'auto';
+        modal.style.color = '#fff';
+
+        // 添加标题
+        const title = document.createElement('h3');
+        title.textContent = `选择要屏蔽的标签 (BV: ${bv})`;
+        title.style.margin = '0 0 15px 0';
+        modal.appendChild(title);
+
+        // 添加说明
+        const description = document.createElement('p');
+        description.textContent = '绿色背景表示已添加到屏蔽列表，点击可移除；灰色背景表示未添加，点击可添加';
+        description.style.margin = '0 0 15px 0';
+        description.style.fontSize = '14px';
+        description.style.color = '#ccc';
+        modal.appendChild(description);
+
+        // 添加标签容器
+        const tagsContainer = document.createElement('div');
+        tagsContainer.style.display = 'flex';
+        tagsContainer.style.flexWrap = 'wrap';
+        tagsContainer.style.gap = '8px';
+        tagsContainer.style.marginBottom = '15px';
+
+        // 添加标签按钮
+        tags.forEach(tag => {
+            if (!tag) return;
+
+            const tagBtn = document.createElement('button');
+            tagBtn.textContent = tag;
+            tagBtn.style.padding = '6px 12px';
+            tagBtn.style.border = 'none';
+            tagBtn.style.borderRadius = '4px';
+            tagBtn.style.cursor = 'pointer';
+            tagBtn.style.transition = 'all 0.2s ease';
+
+            // 检查标签是否已经在屏蔽列表中
+            const isAlreadyBlocked = blockedParameter.blockedTag_Array.includes(tag);
+
+            // 根据是否已屏蔽设置不同的样式
+            if (isAlreadyBlocked) {
+                tagBtn.style.background = '#4caf50'; // 绿色表示已屏蔽
+                tagBtn.style.color = '#fff';
+                tagBtn.title = '点击从屏蔽列表中移除';
+            } else {
+                tagBtn.style.background = '#3a3a3a'; // 灰色表示未屏蔽
+                tagBtn.style.color = '#fff';
+                tagBtn.title = '点击添加到屏蔽列表';
+            }
+
+            tagBtn.addEventListener('click', () => {
+                const index = blockedParameter.blockedTag_Array.indexOf(tag);
+
+                if (index === -1) {
+                    // 添加到屏蔽标签数组
+                    blockedParameter.blockedTag_Array.push(tag);
+                    tagBtn.style.background = '#4caf50'; // 变为绿色
+                    tagBtn.title = '点击从屏蔽列表中移除';
+
+                    // 显示添加成功提示
+                    const tempText = tagBtn.textContent;
+                    tagBtn.textContent = '✓ 已添加';
+                    setTimeout(() => {
+                        tagBtn.textContent = tempText;
+                    }, 1000);
+                } else {
+                    // 从屏蔽标签数组中移除
+                    blockedParameter.blockedTag_Array.splice(index, 1);
+                    tagBtn.style.background = '#3a3a3a'; // 变为灰色
+                    tagBtn.title = '点击添加到屏蔽列表';
+
+                    // 显示移除成功提示
+                    const tempText = tagBtn.textContent;
+                    tagBtn.textContent = '✗ 已移除';
+                    setTimeout(() => {
+                        tagBtn.textContent = tempText;
+                    }, 1000);
+                }
+
+                // 保存设置
+                GM_setValue("GM_blockedParameter", blockedParameter);
+
+                // 触发屏蔽检查
+                FuckYouBilibiliRecommendationSystem();
+            });
+
+            tagsContainer.appendChild(tagBtn);
+        });
+
+        modal.appendChild(tagsContainer);
+
+        // 添加操作按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.justifyContent = 'flex-end';
+
+        // 添加一键全部按钮
+        const addAllBtn = document.createElement('button');
+        addAllBtn.textContent = '一键全部添加';
+        addAllBtn.style.padding = '8px 16px';
+        addAllBtn.style.background = '#558EFF';
+        addAllBtn.style.color = '#fff';
+        addAllBtn.style.border = 'none';
+        addAllBtn.style.borderRadius = '4px';
+        addAllBtn.style.cursor = 'pointer';
+
+        addAllBtn.addEventListener('click', () => {
+            tags.forEach(tag => {
+                if (!tag || blockedParameter.blockedTag_Array.includes(tag)) return;
+                blockedParameter.blockedTag_Array.push(tag);
+            });
+
+            // 更新UI样式
+            tagsContainer.querySelectorAll('button').forEach(btn => {
+                btn.style.background = '#4caf50';
+                btn.title = '点击从屏蔽列表中移除';
+            });
+
+            // 保存设置
+            GM_setValue("GM_blockedParameter", blockedParameter);
+
+            // 触发屏蔽检查
+            FuckYouBilibiliRecommendationSystem();
+
+            // 显示成功提示
+            addAllBtn.textContent = '✓ 已全部添加';
+            setTimeout(() => {
+                addAllBtn.textContent = '一键全部添加';
+            }, 1000);
+        });
+
+        // 添加关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '关闭';
+        closeBtn.style.padding = '8px 16px';
+        closeBtn.style.background = '#666';
+        closeBtn.style.color = '#fff';
+        closeBtn.style.border = 'none';
+        closeBtn.style.borderRadius = '4px';
+        closeBtn.style.cursor = 'pointer';
+
+        closeBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+            document.body.removeChild(overlay);
+        });
+
+        buttonContainer.appendChild(addAllBtn);
+        buttonContainer.appendChild(closeBtn);
+        modal.appendChild(buttonContainer);
+
+        // 添加半透明背景
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(0,0,0,0.7)';
+        overlay.style.zIndex = '9999';
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(modal);
+
+        // 点击背景关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(modal);
+                document.body.removeChild(overlay);
+            }
+        });
+
+        // ESC键关闭
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.body.removeChild(overlay);
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeydown);
+    }
+    // AI分析按钮
+    function addAIButtonToCard(card) {
+        if (card.dataset.aiBtnAdded) return;
+        card.dataset.aiBtnAdded = '1';
+        card.style.position = card.style.position || 'relative';
+
+        // 获取标题
+        const titleElement = card.querySelector('h3.bili-video-card__info--tit');
+        if (!titleElement) return;
+
+        const title = titleElement.getAttribute('title') || titleElement.textContent;
+        if (!title) return;
+
+        // 创建AI分析按钮 - 修改为只有图标，位置在复制按钮旁边
+        const btnHTML = `<button type="button" class="gm-ai-analysis-btn"
+        style="position: absolute; bottom: 6px; right: 40px; z-index: 100; padding: 4px 6px; font-size: 12px; background: #ff6b35; color: #fff; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+        🤖
+    </button>`;
+        card.insertAdjacentHTML('beforeend', btnHTML);
+
+        const btn = card.querySelector('.gm-ai-analysis-btn');
+        if (!btn) return;
+        if (btn.dataset.listenerAdded) return;
+        btn.dataset.listenerAdded = '1';
+
+        // 添加鼠标悬停提示
+        btn.title = 'AI分析标题关键词';
+
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            btn.disabled = true;
+
+            try {
+                showTempText(btn, '分析中...');
+
+                // 调用AI分析标题
+                const keywords = await analyzeTitleWithAI(title);
+
+                if (keywords && keywords.length > 0) {
+                    // 显示关键词选择UI
+                    showKeywordSelectionUI(keywords, title);
+                    showTempText(btn, '完成');
+                } else {
+                    showTempText(btn, '无关键词');
+                }
+            } catch (error) {
+                console.error('AI分析失败:', error);
+                showTempText(btn, '失败');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    }
+    // 同时需要修改标签复制按钮的位置，让两个按钮并排
+    function addButtonToCard(card) {
+        if (card.dataset.copyTagsBtnAdded) return;
+        card.dataset.copyTagsBtnAdded = '1';
+        card.style.position = card.style.position || 'relative';
+
+        const btnHTML = `<button type="button" class="gm-copy-tags-btn"
+        style="position: absolute; bottom: 6px; right: 6px; z-index: 100; padding: 4px 6px; font-size: 12px; background: #0094CA; color: #fff; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+        📋
+    </button>`;
+        card.insertAdjacentHTML('beforeend', btnHTML);
+
+        const btn = card.querySelector('.gm-copy-tags-btn');
+        if (!btn) return;
+        if (btn.dataset.listenerAdded) return;
+        btn.dataset.listenerAdded = '1';
+
+        // 添加鼠标悬停提示
+        btn.title = '复制视频标签';
+
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            btn.disabled = true;
+            const bv = extractBv(card);
+            if (!bv) {
+                showTempText(btn, '未找到BV');
+                btn.disabled = false;
+                return;
+            }
+            const tags = await fetchTags(bv);
+            if (tags) {
+                showTagSelectionUI(tags.split(','), bv);
+                showTempText(btn, '已加载');
+            } else {
+                showTempText(btn, '无标签');
+            }
+            btn.disabled = false;
+        });
+    }
+    // AI分析标题函数
+    async function analyzeTitleWithAI(title) {
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: "deepseek/deepseek-chat-v3.1:free",
+                    messages: [
+                        {
+                            role: "system",
+                            content: "你是一个视频内容分析助手。请从视频标题中提取3-5个最相关的关键词，用逗号分隔返回。只返回关键词，不要其他内容。"
+                        },
+                        {
+                            role: "user",
+                            content: `请分析这个视频标题并提取关键词："${title}"`
+                        }
+                    ],
+                    max_tokens: 100,
+                    temperature: 0.3
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const aiResponse = data.choices[0].message.content.trim();
+
+            // 提取关键词（按逗号分割，去除空格和空值）
+            const keywords = aiResponse.split(',')
+                .map(k => k.trim())
+                .filter(k => k.length > 0);
+
+            return keywords;
+        } catch (error) {
+            console.error('AI分析错误:', error);
+            throw error;
+        }
+    }
+    // 显示关键词选择UI
+    function showKeywordSelectionUI(keywords, originalTitle) {
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.zIndex = '10000';
+        modal.style.background = '#2a2a2a';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '8px';
+        modal.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        modal.style.maxWidth = '80%';
+        modal.style.maxHeight = '80%';
+        modal.style.overflow = 'auto';
+        modal.style.color = '#fff';
+
+        // 添加标题
+        const title = document.createElement('h3');
+        title.textContent = `AI分析结果 - 原标题: "${originalTitle}"`;
+        title.style.margin = '0 0 15px 0';
+        title.style.fontSize = '16px';
+        modal.appendChild(title);
+
+        // 添加说明
+        const description = document.createElement('p');
+        description.textContent = 'AI提取的关键词（绿色表示已添加到屏蔽列表）';
+        description.style.margin = '0 0 15px 0';
+        description.style.fontSize = '14px';
+        description.style.color = '#ccc';
+        modal.appendChild(description);
+
+        // 添加关键词容器
+        const keywordsContainer = document.createElement('div');
+        keywordsContainer.style.display = 'flex';
+        keywordsContainer.style.flexWrap = 'wrap';
+        keywordsContainer.style.gap = '8px';
+        keywordsContainer.style.marginBottom = '15px';
+
+        // 添加关键词按钮
+        keywords.forEach(keyword => {
+            if (!keyword) return;
+
+            const keywordBtn = document.createElement('button');
+            keywordBtn.textContent = keyword;
+            keywordBtn.style.padding = '6px 12px';
+            keywordBtn.style.border = 'none';
+            keywordBtn.style.borderRadius = '4px';
+            keywordBtn.style.cursor = 'pointer';
+            keywordBtn.style.transition = 'all 0.2s ease';
+
+            // 检查关键词是否已经在屏蔽列表中
+            const isAlreadyBlocked = blockedParameter.blockedTitle_Array.includes(keyword);
+
+            // 根据是否已屏蔽设置不同的样式
+            if (isAlreadyBlocked) {
+                keywordBtn.style.background = '#4caf50'; // 绿色表示已屏蔽
+                keywordBtn.style.color = '#fff';
+                keywordBtn.title = '点击从标题屏蔽列表中移除';
+            } else {
+                keywordBtn.style.background = '#3a3a3a'; // 灰色表示未屏蔽
+                keywordBtn.style.color = '#fff';
+                keywordBtn.title = '点击添加到标题屏蔽列表';
+            }
+
+            keywordBtn.addEventListener('click', () => {
+                const index = blockedParameter.blockedTitle_Array.indexOf(keyword);
+
+                if (index === -1) {
+                    // 添加到标题屏蔽数组
+                    blockedParameter.blockedTitle_Array.push(keyword);
+                    keywordBtn.style.background = '#4caf50'; // 变为绿色
+                    keywordBtn.title = '点击从标题屏蔽列表中移除';
+
+                    // 显示添加成功提示
+                    const tempText = keywordBtn.textContent;
+                    keywordBtn.textContent = '✓ 已添加';
+                    setTimeout(() => {
+                        keywordBtn.textContent = tempText;
+                    }, 1000);
+                } else {
+                    // 从标题屏蔽数组中移除
+                    blockedParameter.blockedTitle_Array.splice(index, 1);
+                    keywordBtn.style.background = '#3a3a3a'; // 变为灰色
+                    keywordBtn.title = '点击添加到标题屏蔽列表';
+
+                    // 显示移除成功提示
+                    const tempText = keywordBtn.textContent;
+                    keywordBtn.textContent = '✗ 已移除';
+                    setTimeout(() => {
+                        keywordBtn.textContent = tempText;
+                    }, 1000);
+                }
+
+                // 保存设置
+                GM_setValue("GM_blockedParameter", blockedParameter);
+
+                // 触发屏蔽检查
+                FuckYouBilibiliRecommendationSystem();
+            });
+
+            keywordsContainer.appendChild(keywordBtn);
+        });
+
+        modal.appendChild(keywordsContainer);
+
+        // 添加操作按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.justifyContent = 'flex-end';
+
+        // 添加一键全部按钮
+        const addAllBtn = document.createElement('button');
+        addAllBtn.textContent = '一键全部添加';
+        addAllBtn.style.padding = '8px 16px';
+        addAllBtn.style.background = '#558EFF';
+        addAllBtn.style.color = '#fff';
+        addAllBtn.style.border = 'none';
+        addAllBtn.style.borderRadius = '4px';
+        addAllBtn.style.cursor = 'pointer';
+
+        addAllBtn.addEventListener('click', () => {
+            keywords.forEach(keyword => {
+                if (!keyword || blockedParameter.blockedTitle_Array.includes(keyword)) return;
+                blockedParameter.blockedTitle_Array.push(keyword);
+            });
+
+            // 更新UI样式
+            keywordsContainer.querySelectorAll('button').forEach(btn => {
+                btn.style.background = '#4caf50';
+                btn.title = '点击从标题屏蔽列表中移除';
+            });
+
+            // 保存设置
+            GM_setValue("GM_blockedParameter", blockedParameter);
+
+            // 触发屏蔽检查
+            FuckYouBilibiliRecommendationSystem();
+
+            // 显示成功提示
+            addAllBtn.textContent = '✓ 已全部添加';
+            setTimeout(() => {
+                addAllBtn.textContent = '一键全部添加';
+            }, 1000);
+        });
+
+        // 添加关闭按钮
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '关闭';
+        closeBtn.style.padding = '8px 16px';
+        closeBtn.style.background = '#666';
+        closeBtn.style.color = '#fff';
+        closeBtn.style.border = 'none';
+        closeBtn.style.borderRadius = '4px';
+        closeBtn.style.cursor = 'pointer';
+
+        closeBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+            document.body.removeChild(overlay);
+        });
+
+        buttonContainer.appendChild(addAllBtn);
+        buttonContainer.appendChild(closeBtn);
+        modal.appendChild(buttonContainer);
+
+        // 添加半透明背景
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(0,0,0,0.7)';
+        overlay.style.zIndex = '9999';
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(modal);
+
+        // 点击背景关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(modal);
+                document.body.removeChild(overlay);
+            }
+        });
+
+        // ESC键关闭
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.body.removeChild(overlay);
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeydown);
+    }
+    // scanAndInject
+    function scanAndInject() {
+        const cards = document.querySelectorAll(SELECTOR);
+        cards.forEach(card => {
+            addButtonToCard(card); // 原有的标签按钮
+            addAIButtonToCard(card); // 新增的AI按钮
+        });
+    }
+
+    scanAndInject();
+
+    const mo = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            if (m.addedNodes && m.addedNodes.length) {
+                scanAndInject();
+                break;
+            }
+        }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+})();
