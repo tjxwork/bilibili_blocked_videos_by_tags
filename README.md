@@ -2,7 +2,7 @@
  * @Author: tjxgame@outlook.com
  * @Date: 2024-01-30 14:57:38
  * @LastEditors: tjxgame
- * @LastEditTime: 2025-11-30 17:29:00
+ * @LastEditTime: 2025-11-30 18:02:47
  * @FilePath: \undefinedd:\Projects\GitHub\bilibili_blocked_videos_by_tags\README.md
  * @Description: 给个三连吧
  *
@@ -22,13 +22,14 @@
 
 # 更新：
 
--   v1.5.0 添加新功能： “显示叠加层/关闭叠加层”，可以实时切换是否显示屏蔽叠加层。（我感觉很多人会忍不住关掉屏蔽叠加层看……）
-    添加新功能： “隐藏菜单中的屏蔽词”，可以把菜单中的屏蔽词字符串隐藏成“屏蔽词 1、屏蔽词 2”的效果，感谢来自 @Il 的赞助需求。
-    PS：还活着，但是现在的工作很忙、很折磨人，全是和人打交道的。
-    也有看到 GitHub 最近的 [DostGit](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/25) [DragonWuuu](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/26)
-    这两位提交的合并请求，很感谢两位的热心贡献，不是我不想合并，但是现在快 3000 行，维护起来有点头大，合并新功能后就更多了……
-    原本打算尝试拆分重构整个脚本再合并进去，也方便后面维护和添加新功能，拆到一半又一堆事情催命，再捡起来又忘得差不多了，就一直拖延下去了。
-    现在除了修明显的 Bug 外，暂时不打算添加什么太复杂、会动到结构的新功能了，精力和能力有限，支撑不住，等重构完再考虑吧。
+-   v1.5.0  
+    添加新功能： “显示叠加层/关闭叠加层”，可以实时切换是否显示屏蔽叠加层。（我感觉很多人会忍不住关掉屏蔽叠加层看……）  
+    添加新功能： “隐藏菜单中的屏蔽词”，可以把菜单中的屏蔽词字符串隐藏成“屏蔽词 1、屏蔽词 2”的效果，感谢来自 @Il 的赞助需求。  
+    PS：还活着，但是现在的工作很忙、很折磨人，全是和人打交道的。  
+    也有看到 GitHub 最近的 [DostGit](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/25) [DragonWuuu](https://github.com/tjxwork/bilibili_blocked_videos_by_tags/pull/26)  
+    这两位提交的合并请求，很感谢两位的热心贡献，不是我不想合并，但是现在快 3000 行，维护起来有点头大，合并新功能后就更多了……  
+    原本打算尝试拆分重构整个脚本再合并进去，也方便后面维护和添加新功能，拆到一半又一堆事情催命，再捡起来又忘得差不多了，就一直拖延下去了。  
+    现在除了修明显的 Bug 外，暂时不打算添加什么太复杂、会动到结构的新功能了，精力和能力有限，支撑不住，等重构完再考虑吧。  
     也有一部分原因是我觉得必要的核心功能其实已经做得差不多了，剩下能加的功能基本都是完善体验方面的了。
 
 -   v1.4.5 功能故障修复：修复字节跳动 Vue CDN 失效所导致功能界面不正常问题，感谢[abh0r](https://github.com/abh0r)的提醒。
