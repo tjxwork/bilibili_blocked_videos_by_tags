@@ -775,6 +775,14 @@ let menuUiHTML = `
 
         <div class="menuOptions">
             <div class="titleLabelLeft">
+                <label title="UP主API，是拿到UP主的关注数后判断的"><input type="checkbox" v-model="menuUiSettings.blockedAboveUpAttention_Switch" />屏蔽高于此UP主关注数的视频(?)</label>
+            </div>
+            <input type="number" spellcheck="false" v-model="menuUiSettings.blockedAboveUpAttention" />
+            <label>人</label>
+        </div>
+
+        <div class="menuOptions">
+            <div class="titleLabelLeft">
                 <label title="UP主API，是拿到UP主的简介后判断的"><input type="checkbox" v-model="menuUiSettings.blockedUpSigns_Switch" />按UP主简介屏蔽视频(?)</label>
             </div>
 
@@ -2044,6 +2052,10 @@ function getVideoApiUpInfo(videoBv) {
             videoUpInfoDict[upUid].upSign = videoApiUpInfoJson.data.card.sign;
             videoInfoDict[videoBv].videoUpSign = videoApiUpInfoJson.data.card.sign;
 
+            // 获取UP主关注数
+            videoUpInfoDict[upUid].upAttention = videoApiUpInfoJson.data.card.attention;
+            videoInfoDict[videoBv].videoUpAttention = videoApiUpInfoJson.data.card.attention;
+
             // API获取的UP主信息的时间:
             const currentTime = new Date(); //获取当前时间
             videoUpInfoDict[upUid].updateTime = currentTime;
@@ -2092,6 +2104,26 @@ function handleBlockedBelowUpFans(videoBv) {
     if (blockedParameter.blockedBelowUpFans > videoUpInfoDict[upUid].upFans) {
         // 标记为屏蔽目标并记录触发的规则
         markAsBlockedTarget(videoBv, "屏蔽低UP主粉丝数", videoUpInfoDict[upUid].upFans + "人");
+    }
+}
+
+// 处理匹配的高于指定UP主关注数的视频
+function handleBlockedBelowUpAttention(videoBv) {
+    // 没有拿到UP主的Uid，跳过
+    if (!videoInfoDict[videoBv].videoUpUid) {
+        return;
+    }
+
+    const upUid = videoInfoDict[videoBv].videoUpUid;
+    // 没有拿到UP主关注数，跳过
+    if (!videoUpInfoDict[upUid].upAttention) {
+        return;
+    }
+
+    // 判断设置的屏蔽UP主关注数 是否大于 视频的UP主关注数
+    if (blockedParameter.blockedAboveUpAttention < videoUpInfoDict[upUid].upAttention) {
+        // 标记为屏蔽目标并记录触发的规则
+        markAsBlockedTarget(videoBv, "屏蔽高UP主关注数", videoUpInfoDict[upUid].upAttention + "人");
     }
 }
 
@@ -2948,6 +2980,12 @@ function FuckYouBilibiliRecommendationSystem() {
         if (blockedParameter.blockedBelowUpFans_Switch && blockedParameter.blockedBelowUpFans > 0) {
             // 判断处理匹配的低于指定UP主粉丝数的视频
             handleBlockedBelowUpFans(videoBv);
+        }
+
+        // 是否启用 屏蔽高于指定UP主关注数的视频
+        if (blockedParameter.blockedAboveUpAttention_Switch && blockedParameter.blockedAboveUpAttention > 0) {
+            // 判断处理匹配的高于指定UP主关注数的视频
+            handleBlockedBelowUpAttention(videoBv);
         }
 
         // 是否启用 屏蔽包含相关UP主简介的视频
